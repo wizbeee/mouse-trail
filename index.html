@@ -34,6 +34,8 @@
   #toast.show { opacity: 1; }
   /* 레이저 펜: 쓰는 동안만 마우스를 받음. 완전 투명 픽셀은 클릭이 빠져나갈 수 있어 아주 옅게 칠함 */
   body.pen { background: rgba(0, 0, 0, 0.004); cursor: crosshair; }
+  /* 손가락·펜으로 끌 때 브라우저가 '화면 밀기'로 가져가 선이 끊기지 않게(10/7 터치스크린에서 안 써짐) */
+  body.pen, body.pen canvas { touch-action: none; }
   #penBar {
     position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
     display: none; align-items: center; gap: 12px;
