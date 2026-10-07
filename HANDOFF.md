@@ -1,7 +1,7 @@
-# Mouse Trail 인수인계 — v1.1.1 (2026-10-07)
+# Mouse Trail 인수인계 — v1.1.2 (2026-10-07)
 
 > 계획서: `../프로그램_소개_및_계획서_2026-10-07/03_MouseTrail_업그레이드계획서_v2.md`
-> **Public GitHub [wizbeee/mouse-trail](https://github.com/wizbeee/mouse-trail)** · 릴리스 v1.1.0 · v1.1.1. 올리기: `GH_TOKEN=$(gh auth token) npm run publish` (package.json 버전 먼저 올림)
+> **Public GitHub [wizbeee/mouse-trail](https://github.com/wizbeee/mouse-trail)** · 릴리스 v1.1.0 · v1.1.1 · v1.1.2. 올리기: `GH_TOKEN=$(gh auth token) npm run publish` (package.json 버전 먼저 올림)
 
 ## ✅ 된 것 (코드 + 시험)
 
@@ -34,6 +34,12 @@
 
 ## 자동 업데이트 시험 기록 (2026-10-07)
 - 설치본 1.1.0 실행 → 약 10초 뒤 v1.1.1 을 `%LOCALAPPDATA%mouse-trail-updaterpending` 에 내려받음 확인. 설치는 종료 때 또는 설정 창 [지금 재시작].
+
+## 1.1.2 에서 바꾼 것 (10/7)
+- **꼬리 색**: 머리부터 끝까지 고른 색, 투명도로만 사라짐(1.0의 흰 머리 없앰 — 발주자 「흰색 → 원래 색 → 검게 사라짐이 어색」). 밝은 바탕 테두리도 색과 같은 비율로 옅어짐(따로 옅어지면 꼬리 끝에 검은 테두리만 남았음).
+- **설치 방식**: `oneClick:true, perMachine:false` = 늘 현재 사용자(AppData)에 설치. 선택형(oneClick:false)은 1.1.0→1.1.1 자동 업데이트 때 **Program Files(모든 사용자)로 옮겨 감** → 관리자 권한 없는 학교 PC 에서 업데이트 실패 위험.
+- **레이저 펜 Esc**: 교사 도구함의 덮개 도구(판서·가림막 등)가 켜져 있으면 도구함이 전역 Esc 를 쥐고 있어 펜이 Esc 를 못 잡음 → 0.5초마다 다시 시도, 그동안 위쪽 띠에 「[끝내기] 또는 단축키로 마침」.
+- **연기 시험 기본은 발주자 PC 를 안 건드림**: 실제 키·마우스·펜(클릭 막힘)은 `MT_SMOKE_REAL=1`, PowerPoint 는 `MT_SMOKE_PPT=1` 일 때만. 펜은 숨은 창 시험 `npx electron test/look/pen.js <폴더>` 로 확인. ⚠ 10/7 펜 시험의 실제 Esc 가 도구함 덮개 도구로 갔을 가능성 있음.
 
 ## 알아 둘 것
 - Word: Ctrl+Shift+F9(필드 연결 끊기)·F11(필드 잠금 해제)·F12(인쇄)와 겹침. 앱이 가로챔.

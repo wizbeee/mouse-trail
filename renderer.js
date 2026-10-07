@@ -156,8 +156,14 @@ window.mt.onClick(({ x, y, button }) => {
   ripples.push({ x: x - origin.x, y: y - origin.y, button, t0: performance.now() });
 });
 
-window.mt.onPen(on => {
+const penMsg = document.getElementById('penMsg');
+window.mt.onPen(({ on, escOk, endKey }) => {
   penOn = on;
+  if (penMsg) {
+    penMsg.textContent = escOk
+      ? '레이저 펜 · 쓴 글씨는 잠시 뒤 사라져요 · Esc로 끝내기'
+      : '레이저 펜 · Esc는 다른 프로그램이 쓰는 중 — [끝내기]' + (endKey ? ' 또는 ' + endKey : '') + '로 마침';
+  }
   document.body.classList.toggle('pen', on);
   if (!on) penUp();   // 쓰던 글씨는 그대로 두었다가 시간이 되면 사라짐
 });
@@ -332,7 +338,8 @@ function drawTrail() {
       if (!segs[s]) continue;
       const t  = tSeg[s];
       const vf = speedToFactor(avgSpeed(speeds, meta[s].a, meta[s].b));
-      ctx.strokeStyle = 'rgba(0,0,0,' + (0.05 + t * 0.09) * vf * fadeSeg[s] + ')';
+      // 색 선과 같은 비율로 옅어지게 — 따로 옅어지면 꼬리 끝에 검은 테두리만 남아 '검게 사라지는' 것처럼 보임
+      ctx.strokeStyle = 'rgba(0,0,0,' + (0.30 + t * 0.65) * vf * fadeSeg[s] * 0.2 + ')';
       ctx.lineWidth   = (0.40 + t * 1.10) * vf * k + 1.6 * k;
       ctx.stroke(segs[s]);
     }
@@ -350,9 +357,10 @@ function drawTrail() {
       const t    = tSeg[s];                                 // 꼬리 끝 0 → 머리 1
       const vf   = speedToFactor(avgSpeed(speeds, meta[s].a, meta[s].b));
       const w    = (0.40 + t * 1.10) * vf * k;              // 얇게 0.4 → 1.5 px (중앙)
-      const a    = (0.18 + t * 0.75) * strand.alphaMult * vf * fadeSeg[s];
-      // 꼬리 끝은 설정된 컬러, 헤드는 흰색에 가깝게 (혜성 그라디언트)
-      const color = lerpRGB(settings.glow, settings.core, t * t);
+      const a    = (0.30 + t * 0.65) * strand.alphaMult * vf * fadeSeg[s];
+      // 머리부터 끝까지 고른 색 그대로 — 색이 바뀌지 않고 투명도로만 사라짐
+      // (1.0은 머리를 흰색으로 섞었음: 10/7 발주자 '흰색 → 원래 색 → 검게 사라짐이 어색')
+      const color = settings.glow;
 
       ctx.shadowBlur  = 3.5 * k;
       ctx.shadowColor = 'rgba(' + color + ',0.7)';
@@ -367,8 +375,8 @@ function drawTrail() {
   const headSpd   = speeds[N - 1];
   const sparkSize = (0.9 + Math.max(0, 1 - headSpd / 1200) * 1.6) * k;
   ctx.shadowBlur  = 6 * k;
-  ctx.shadowColor = 'rgba(' + settings.core + ',' + ageT[N - 1] + ')';
-  ctx.fillStyle   = 'rgba(' + settings.core + ',' + 0.92 * ageT[N - 1] + ')';   // 멈추면 빛점도 함께 옅어짐
+  ctx.shadowColor = 'rgba(' + settings.glow + ',' + ageT[N - 1] + ')';
+  ctx.fillStyle   = 'rgba(' + settings.glow + ',' + 0.95 * ageT[N - 1] + ')';   // 빛점도 고른 색, 멈추면 함께 옅어짐
   ctx.beginPath();
   ctx.arc(head.x, head.y, sparkSize, 0, Math.PI * 2);
   ctx.fill();

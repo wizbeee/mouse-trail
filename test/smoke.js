@@ -7,6 +7,9 @@ const { execFile, spawn } = require('child_process');
 
 // 캡처 결과가 미리 곱한 알파일 때도, 흰 바탕에 합성될 때도 있어 채도(최대-최소)로 진하기를 잼
 const sat = (p) => Math.max(p.r, p.g, p.b) - Math.min(p.r, p.g, p.b);
+// 발주자 PC 를 건드리는 부분(실제 키·마우스 보내기, 클릭을 막는 펜 모드, PowerPoint 띄우기)은
+// 기본으로 건너뜀. PC 를 아무도 안 쓸 때만 MT_SMOKE_REAL=1 (펜·키) · MT_SMOKE_PPT=1 (슬라이드 쇼) 로 켬.
+const REAL = !!process.env.MT_SMOKE_REAL;
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const results = [];
 const check = (name, ok, info = '') => { results.push({ name, ok }); console.log(`${ok ? 'PASS' : 'FAIL'} ${name} ${info}`); };
@@ -149,12 +152,14 @@ module.exports = async function smoke(api) {
   // 7) 단축키 — 등록 상태 + Ctrl+Shift+F9 를 실제로 눌러 켜기/끄기
   const hs = api.hotkeyStatus();
   check('단축키 3개 등록', Object.values(hs).every(v => v === 'ok'), JSON.stringify(hs));
-  const before = api.settings.enabled;
-  await new Promise(r => execFile('powershell', ['-NoProfile', '-Command',
-    "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^+{F9}')"], r));
-  await sleep(300);
-  check('Ctrl+Shift+F9 로 켜기/끄기', api.settings.enabled === !before);
-  api.setEnabled(true, false);
+  if (REAL) {
+    const before = api.settings.enabled;
+    await new Promise(r => execFile('powershell', ['-NoProfile', '-Command',
+      "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^+{F9}')"], r));
+    await sleep(300);
+    check('Ctrl+Shift+F9 로 켜기/끄기', api.settings.enabled === !before);
+    api.setEnabled(true, false);
+  }
 
   // 7-1) 빛나는 커서 크기: 은은하게 지름 72 → 반지름 30px 자리에도 빛이 있음
   api.update({ halo: 'soft', haloStyle: 'fade' });
@@ -207,70 +212,73 @@ module.exports = async function smoke(api) {
   g = await grab();
   check('파문은 0.4초 뒤 사라짐', g.countIn(R2.x, R2.y, 40) === 0);
 
-  // 7-5) 레이저 펜: 진짜 마우스로 끌어 쓰기. 오버레이가 받지 못하면 밑의 시험 창이 클릭을 받음 → 실패로 잡힘
-  const target = new BrowserWindow({ x: Math.round(Q.x - 200), y: Math.round(Q.y - 120), width: 400, height: 240, show: false, frame: false, backgroundColor: '#ffffff' });
-  await target.loadURL('data:text/html,<body style="margin:0;height:100vh" onpointerdown="window.hit=(window.hit||0)+1"></body>');
-  target.showInactive();
-  await sleep(300);
-  const hooksBefore = api.hookEvents();
-  api.setPenMode(true);
-  await sleep(300);
-  check('펜 켜짐', api.penMode === true);
-  const p0 = screen.dipToScreenPoint({ x: Q.x - 120, y: Q.y });
-  const step = Math.round(screen.dipToScreenPoint({ x: Q.x - 112, y: Q.y }).x - p0.x);   // 8 DIP 의 실제 픽셀
-  const ps = `
-Add-Type @"
-using System; using System.Runtime.InteropServices;
-public static class M {
-  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
-  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
-  [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT p);
-  [DllImport("user32.dll")] public static extern void mouse_event(uint f, int dx, int dy, uint d, IntPtr e);
-  public struct POINT { public int X; public int Y; }
-}
-"@
-[M]::SetProcessDPIAware() | Out-Null
-$o = New-Object M+POINT; [M]::GetCursorPos([ref]$o) | Out-Null
-[M]::SetCursorPos(${p0.x}, ${p0.y}) | Out-Null; Start-Sleep -Milliseconds 60
-[M]::mouse_event(2, 0, 0, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds 30
-for ($i = 1; $i -le 30; $i++) { [M]::SetCursorPos(${p0.x} + $i * ${step}, ${p0.y} + [int](30 * [Math]::Sin($i / 5))) | Out-Null; Start-Sleep -Milliseconds 12 }
-[M]::mouse_event(4, 0, 0, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds 60
-[M]::SetCursorPos($o.X, $o.Y) | Out-Null
-`;
-  const psFile = path.join(out, 'drag.ps1');
-  fs.writeFileSync(psFile, '\ufeff' + ps, 'utf8');
-  await new Promise(r => execFile('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', psFile], r));
-  await sleep(150);
-  g = await grab();
-  const penPx = g.countIn(Q.x, Q.y, 140);
-  check('레이저 펜으로 쓴 선이 보임', penPx > 300, `pixels=${penPx}`);
-  fs.writeFileSync(path.join(out, 'pen.png'), g.crop(Q.x, Q.y, 140).toPNG());
-  const hit = await target.webContents.executeJavaScript('window.hit || 0');
-  check('펜으로 쓸 때 밑의 프로그램은 클릭을 받지 않음', hit === 0, `밑 창 클릭 ${hit}회`);
-  check('클릭 감지 모듈이 실제 클릭을 받음', api.hookEvents() > hooksBefore, `${hooksBefore} → ${api.hookEvents()}`);
+  if (REAL) {
+    // 7-5) 레이저 펜: 진짜 마우스로 끌어 쓰기. 오버레이가 받지 못하면 밑의 시험 창이 클릭을 받음 → 실패로 잡힘
+    const target = new BrowserWindow({ x: Math.round(Q.x - 200), y: Math.round(Q.y - 120), width: 400, height: 240, show: false, frame: false, backgroundColor: '#ffffff' });
+    await target.loadURL('data:text/html,<body style="margin:0;height:100vh" onpointerdown="window.hit=(window.hit||0)+1"></body>');
+    target.showInactive();
+    await sleep(300);
+    const hooksBefore = api.hookEvents();
+    api.setPenMode(true);
+    await sleep(300);
+    check('펜 켜짐', api.penMode === true);
+    check('펜 동안 Esc 를 잡음', api.penEscOk === true, '실패면 다른 프로그램(교사 도구함 덮개 도구 등)이 Esc 를 쥐고 있음');
+    const p0 = screen.dipToScreenPoint({ x: Q.x - 120, y: Q.y });
+    const step = Math.round(screen.dipToScreenPoint({ x: Q.x - 112, y: Q.y }).x - p0.x);   // 8 DIP 의 실제 픽셀
+    const ps = `
+  Add-Type @"
+  using System; using System.Runtime.InteropServices;
+  public static class M {
+    [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+    [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT p);
+    [DllImport("user32.dll")] public static extern void mouse_event(uint f, int dx, int dy, uint d, IntPtr e);
+    public struct POINT { public int X; public int Y; }
+  }
+  "@
+  [M]::SetProcessDPIAware() | Out-Null
+  $o = New-Object M+POINT; [M]::GetCursorPos([ref]$o) | Out-Null
+  [M]::SetCursorPos(${p0.x}, ${p0.y}) | Out-Null; Start-Sleep -Milliseconds 60
+  [M]::mouse_event(2, 0, 0, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds 30
+  for ($i = 1; $i -le 30; $i++) { [M]::SetCursorPos(${p0.x} + $i * ${step}, ${p0.y} + [int](30 * [Math]::Sin($i / 5))) | Out-Null; Start-Sleep -Milliseconds 12 }
+  [M]::mouse_event(4, 0, 0, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds 60
+  [M]::SetCursorPos($o.X, $o.Y) | Out-Null
+  `;
+    const psFile = path.join(out, 'drag.ps1');
+    fs.writeFileSync(psFile, '\ufeff' + ps, 'utf8');
+    await new Promise(r => execFile('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', psFile], r));
+    await sleep(150);
+    g = await grab();
+    const penPx = g.countIn(Q.x, Q.y, 140);
+    check('레이저 펜으로 쓴 선이 보임', penPx > 300, `pixels=${penPx}`);
+    fs.writeFileSync(path.join(out, 'pen.png'), g.crop(Q.x, Q.y, 140).toPNG());
+    const hit = await target.webContents.executeJavaScript('window.hit || 0');
+    check('펜으로 쓸 때 밑의 프로그램은 클릭을 받지 않음', hit === 0, `밑 창 클릭 ${hit}회`);
+    check('클릭 감지 모듈이 실제 클릭을 받음', api.hookEvents() > hooksBefore, `${hooksBefore} → ${api.hookEvents()}`);
 
-  // Esc 로 끝 → 2.5초 뒤 글씨 사라짐
-  await new Promise(r => execFile('powershell', ['-NoProfile', '-Command',
-    "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('{ESC}')"], r));
-  await sleep(300);
-  check('Esc 로 펜 끝', api.penMode === false);
-  g = await grab();
-  check('펜을 끝내도 글씨는 잠시 남음', g.countIn(Q.x, Q.y, 140) > 300);
-  await sleep(2600);
-  g = await grab();
-  check('2.5초 뒤 글씨 사라짐', g.countIn(Q.x, Q.y, 140) === 0);
-  target.destroy();
+    // Esc 로 끝 → 2.5초 뒤 글씨 사라짐
+    await new Promise(r => execFile('powershell', ['-NoProfile', '-Command',
+      "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('{ESC}')"], r));
+    await sleep(300);
+    check('Esc 로 펜 끝', api.penMode === false);
+    g = await grab();
+    check('펜을 끝내도 글씨는 잠시 남음', g.countIn(Q.x, Q.y, 140) > 300);
+    await sleep(2600);
+    g = await grab();
+    check('2.5초 뒤 글씨 사라짐', g.countIn(Q.x, Q.y, 140) === 0);
+    target.destroy();
 
-  // 단축키 순환: 꼬리 → 레이저 → 펜 → 꼬리
-  api.update({ shape: 'trail' });
-  api.toggleLaser(); const s1 = api.settings.shape;
-  api.toggleLaser(); const s2 = api.penMode;
-  api.toggleLaser(); const s3 = api.settings.shape + '/' + api.penMode;
-  check('단축키 순환 꼬리→레이저→펜→꼬리', s1 === 'laser' && s2 === true && s3 === 'trail/false', `${s1} ${s2} ${s3}`);
+    // 단축키 순환: 꼬리 → 레이저 → 펜 → 꼬리
+    api.update({ shape: 'trail' });
+    api.toggleLaser(); const s1 = api.settings.shape;
+    api.toggleLaser(); const s2 = api.penMode;
+    api.toggleLaser(); const s3 = api.settings.shape + '/' + api.penMode;
+    check('단축키 순환 꼬리→레이저→펜→꼬리', s1 === 'laser' && s2 === true && s3 === 'trail/false', `${s1} ${s2} ${s3}`);
+  }
   api.update({ clickMark: 'off' });
 
-  // 7-6) 슬라이드 쇼 자동 켜짐: 진짜 PowerPoint 로 빈 슬라이드 쇼를 잠깐 띄움 (MT_SMOKE_NO_PPT=1 이면 건너뜀)
-  if (!process.env.MT_SMOKE_NO_PPT) {
+  // 7-6) 슬라이드 쇼 자동 켜짐: 진짜 PowerPoint 로 빈 슬라이드 쇼를 잠깐 띄움 (MT_SMOKE_PPT=1 일 때만)
+  if (process.env.MT_SMOKE_PPT) {
     api.update({ autoSlideshow: true });
     api.setEnabled(false, false);
     await sleep(2500);   // 감시 PowerShell 준비(Add-Type 컴파일)

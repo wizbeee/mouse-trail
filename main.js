@@ -41,6 +41,8 @@ try {
 
 // 레이저 펜 (B6) — 쓰는 동안만 오버레이가 마우스를 받음. 저장하지 않음(다시 켜면 늘 꺼진 상태)
 let penMode = false;
+let penEscOk = false;          // 펜 동안 Esc 를 잡았는가 (교사 도구함 덮개 도구 등이 먼저 잡고 있으면 실패)
+let penEscRetry = null;
 
 let settings = store.load(SETTINGS_FILE);   // 옛 판 값(발표 모드 등)은 여기서 정리됨 → 시작 때 한 번 다시 저장
 
@@ -339,15 +341,15 @@ function toggleLaser() {
 function applyPenToOverlay(win) {
   if (!win || win.isDestroyed()) return;
   win.setIgnoreMouseEvents(!penMode);
-  win.webContents.send('pen', penMode);
+  win.webContents.send('pen', { on: penMode, escOk: penEscOk, endKey: (settings.hotkeys.laser || '').replace(/Control/g, 'Ctrl') });
 }
 
 function setPenMode(on, withToast = true) {
   if (penMode === on) return;
   penMode = on;
-  for (const win of overlays.values()) applyPenToOverlay(win);
   registerHotkeys();   // 펜 동안만 Esc 를 잡음
-  if (withToast) toast(on ? '레이저 펜 · Esc로 끝내기' : '레이저 펜 끝');
+  for (const win of overlays.values()) applyPenToOverlay(win);
+  if (withToast) toast(on ? (penEscOk ? '레이저 펜 · Esc로 끝내기' : '레이저 펜 · [끝내기]로 마침') : '레이저 펜 끝');
   pushState();
 }
 
@@ -433,8 +435,24 @@ function registerHotkeys() {
     try { ok = globalShortcut.register(acc, fn); } catch (_) { ok = false; }
     hotkeyStatus[name] = ok ? 'ok' : 'fail';
   }
+  penEscOk = false;
+  if (penEscRetry) { clearInterval(penEscRetry); penEscRetry = null; }
   if (penMode) {
-    try { globalShortcut.register('Escape', () => setPenMode(false)); } catch (_) {}
+    // 다른 프로그램(교사 도구함의 판서·가림막 등)이 Esc 를 쥐고 있으면 실패 → 0.5초마다 다시 시도하고,
+    // 그동안은 위쪽 띠에 [끝내기]·단축키로 끝내라고 알림
+    const tryEsc = () => {
+      try { penEscOk = globalShortcut.register('Escape', () => setPenMode(false)); } catch (_) { penEscOk = false; }
+      return penEscOk;
+    };
+    if (!tryEsc()) {
+      penEscRetry = setInterval(() => {
+        if (!penMode) { clearInterval(penEscRetry); penEscRetry = null; return; }
+        if (tryEsc()) {
+          clearInterval(penEscRetry); penEscRetry = null;
+          for (const win of overlays.values()) applyPenToOverlay(win);
+        }
+      }, 500);
+    }
   }
 }
 
@@ -643,7 +661,7 @@ app.whenReady().then(() => {
   if (process.env.MT_SMOKE) {
     require('./test/smoke')({
       get settings() { return settings; }, overlays, update, setEnabled, toggleLaser, setPenMode, get penMode() { return penMode; },
-      hookEvents: () => hookEvents, get slideActive() { return slideActive; }, get clickAvailable() { return clickAvailable; },
+      hookEvents: () => hookEvents, get slideActive() { return slideActive; }, get penEscOk() { return penEscOk; }, get clickAvailable() { return clickAvailable; },
       locateCursor, openSettings, get settingsWin() { return settingsWin; }, hotkeyStatus: () => hotkeyStatus,
       SETTINGS_FILE,
     });
