@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+<title>Mouse Trail 설정</title>
+<style>
+  :root {
+    --bg: #f6f6f8;
+    --card: #ffffff;
+    --line: #e4e4ea;
+    --text: #1d1d24;
+    --muted: #6b6b78;
+    --seg: #efeff3;
+    --accent: rgb(170,140,255);
+    --accent-ink: #1d1d24;
+    --warn: #b4441c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17171c;
+      --card: #202027;
+      --line: #32323c;
+      --text: #ececf2;
+      --muted: #9a9aa8;
+      --seg: #2a2a33;
+      --warn: #ff9a6e;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font: 14px/1.45 "Pretendard", "Malgun Gothic", "맑은 고딕", sans-serif;
+    padding: 14px 14px 18px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+  }
+  .row { display: flex; align-items: center; gap: 10px; min-height: 40px; }
+  .row + .row { margin-top: 4px; }
+  .row > .label { width: 78px; align-self: flex-start; padding-top: 10px; flex: none; color: var(--muted); font-size: 13px; }
+  .grow { flex: 1; }
+  .hint { color: var(--muted); font-size: 12px; margin: 2px 0 0 88px; }
+  .warn { color: var(--warn); font-size: 12px; }
+  .banner {
+    background: var(--card); border: 1px solid var(--accent); border-left-width: 4px;
+    border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; display: flex; gap: 10px; align-items: flex-start;
+  }
+  .banner svg { flex: none; margin-top: 2px; }
+
+  /* 큰 켜짐/발표 스위치 */
+  .toggles { display: flex; gap: 8px; }
+  .big {
+    flex: 1; height: 44px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--seg); color: var(--text); font: inherit; font-weight: 600;
+    display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
+  }
+  .big .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--muted); }
+  .big[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 700; }
+  .big[aria-pressed="true"] .dot { background: var(--accent-ink); border-color: var(--accent-ink); }
+
+  /* 단계 고르기 */
+  .seg { display: flex; background: var(--seg); border-radius: 9px; padding: 3px; gap: 3px; flex: 1; }
+  .seg button {
+    flex: 1; min-height: 36px; border: 0; border-radius: 7px; background: transparent;
+    color: var(--muted); font: inherit; cursor: pointer; padding: 0 6px;
+  }
+  .seg button[aria-pressed="true"] {
+    background: var(--card); color: var(--text); font-weight: 700;
+    box-shadow: 0 1px 2px rgba(0,0,0,.12), inset 0 -3px 0 var(--accent);
+  }
+  .seg button:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* 색 */
+  .swatches { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .sw {
+    width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line);
+    cursor: pointer; padding: 0; position: relative;
+  }
+  .sw[aria-pressed="true"] { border-color: var(--text); box-shadow: 0 0 0 2px var(--card) inset; }
+  .sw[aria-pressed="true"]::after {
+    content: ""; position: absolute; inset: 8px; border-radius: 50%; background: rgba(0,0,0,.55);
+  }
+  .pick {
+    height: 36px; border-radius: 18px; border: 1px dashed var(--muted); background: transparent;
+    color: var(--text); font: inherit; padding: 0 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  }
+  input[type=color] { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
+
+  label.chk { display: flex; align-items: center; gap: 8px; min-height: 36px; cursor: pointer; }
+  label.chk input { width: 18px; height: 18px; accent-color: var(--accent); }
+  label.chk.disabled { color: var(--muted); cursor: not-allowed; }
+
+  .small-btn {
+    min-height: 36px; border-radius: 8px; border: 1px solid var(--line); background: var(--seg);
+    color: var(--text); font: inherit; padding: 0 12px; cursor: pointer;
+  }
+  .small-btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 700; }
+
+  .preview {
+    height: 120px; border-radius: 10px; border: 1px dashed var(--line);
+    display: flex; align-items: center; justify-content: center; text-align: center;
+    color: var(--muted); font-size: 13px; padding: 10px;
+    background: repeating-linear-gradient(45deg, transparent 0 14px, rgba(127,127,127,.06) 14px 28px);
+  }
+  .preview.light { background: #fff; color: #888; }
+
+  .hk {
+    min-width: 150px; min-height: 36px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--seg); color: var(--text); font: 600 13px/1 Consolas, "Malgun Gothic", monospace;
+    padding: 0 10px; cursor: pointer; text-align: left;
+  }
+  .hk.capturing { outline: 2px solid var(--accent); }
+  .hk-name { width: 78px; flex: none; color: var(--muted); font-size: 13px; }
+
+  footer { color: var(--muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 2px 4px; }
+  footer .sep { opacity: .5; }
+  .link { background: none; border: 0; color: inherit; text-decoration: underline; font: inherit; cursor: pointer; padding: 0; min-height: 28px; }
+  h2 { font-size: 12px; font-weight: 700; color: var(--muted); margin: 0 0 4px; letter-spacing: .2px; }
+</style>
+</head>
+<body>
+
+<div class="banner" id="firstRun" hidden>
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+  <div>Mouse Trail 은 <b>작업 표시줄 오른쪽(시계 옆) 트레이</b>에 있어요. 아이콘을 누르면 이 창이 다시 열리고, 오른쪽 클릭하면 빠른 메뉴가 나옵니다.</div>
+</div>
+
+<div class="card">
+  <div class="toggles">
+    <button class="big" id="enabled"><span class="dot"></span>켜짐</button>
+    <button class="big" id="presentation"><span class="dot"></span>발표 모드</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="row">
+    <span class="label">색</span>
+    <div class="swatches grow" id="swatches"></div>
+  </div>
+  <div class="row">
+    <span class="label">길이</span>
+    <div class="seg" data-key="life">
+      <button data-v="short">짧게</button><button data-v="normal">보통</button><button data-v="long">길게</button>
+    </div>
+  </div>
+  <div class="row">
+    <span class="label">굵기</span>
+    <div class="seg" data-key="thickness">
+      <button data-v="thin">얇게</button><button data-v="normal">보통</button><button data-v="thick">굵게</button>
+    </div>
+  </div>
+  <div class="row">
+    <span class="label">빛나는 커서</span>
+    <div class="seg" data-key="halo">
+      <button data-v="off">끔</button><button data-v="soft">은은하게</button><button data-v="strong">선명하게</button>
+    </div>
+  </div>
+  <div class="hint"><label class="chk" style="min-height:28px"><input type="checkbox" id="haloPulse"> 멈춰 있을 때 은은한 맥박</label></div>
+  <div class="row">
+    <span class="label">클릭 표시</span>
+    <div class="seg" data-key="clickMark">
+      <button data-v="off">끔</button><button data-v="ripple">파문</button>
+    </div>
+  </div>
+  <div class="hint" id="clickHint">학교 PC에서 확인을 마친 뒤 켤 수 있습니다.</div>
+  <div class="row">
+    <span class="label">모양</span>
+    <div class="seg" data-key="shape">
+      <button data-v="trail">꼬리</button><button data-v="laser">레이저 포인터</button>
+    </div>
+  </div>
+  <div class="row" id="laserRow">
+    <span class="label">레이저 색</span>
+    <div class="seg" data-key="laserColor">
+      <button data-v="red">빨강</button><button data-v="green">초록</button>
+    </div>
+  </div>
+  <div class="hint"><label class="chk" style="min-height:28px"><input type="checkbox" id="outline"> 밝은 바탕용 옅은 테두리 항상 켜기</label></div>
+</div>
+
+<div class="card">
+  <h2>적용 화면</h2>
+  <div id="displays"></div>
+  <div class="row">
+    <button class="small-btn" id="dspAll">모든 화면</button>
+    <button class="small-btn" id="dspExt">주 화면 제외(프로젝터만)</button>
+  </div>
+  <h2 style="margin-top:10px">자동 켜짐</h2>
+  <label class="chk"><input type="checkbox" id="autoMultiMonitor"> 모니터가 2대 이상이면 켜고, 1대가 되면 끄기</label>
+  <label class="chk" id="slideshowLabel"><input type="checkbox" id="autoSlideshow"> PowerPoint 슬라이드 쇼가 시작되면 발표 모드로</label>
+  <div class="hint" id="slideshowHint" style="margin-left:26px">확인을 마친 뒤 켤 수 있습니다.</div>
+</div>
+
+<div class="card">
+  <div class="preview" id="preview">미리 보기: 이 상자 안에서 마우스를 움직여 보세요.<br>멈추면 커서 둘레에 빛이 살아납니다.</div>
+  <div class="row" style="justify-content:flex-end; min-height:32px">
+    <label class="chk" style="min-height:28px; font-size:12px; color:var(--muted)"><input type="checkbox" id="lightPreview"> 흰 바탕에서 보기</label>
+  </div>
+</div>
+
+<div class="card">
+  <h2>단축키 <span style="font-weight:400">(누른 뒤 새 조합을 입력, Esc 취소, Backspace 끔)</span></h2>
+  <div class="row"><span class="hk-name">켜기/끄기</span><button class="hk" data-hk="toggle"></button><span class="warn" data-hkw="toggle"></span></div>
+  <div class="row"><span class="hk-name">발표 모드</span><button class="hk" data-hk="presentation"></button><span class="warn" data-hkw="presentation"></span></div>
+  <div class="row"><span class="hk-name">커서 찾기</span><button class="hk" data-hk="find"></button><span class="warn" data-hkw="find"></span></div>
+  <div class="row"><span class="hk-name">레이저</span><button class="hk" data-hk="laser"></button><span class="warn" data-hkw="laser"></span></div>
+  <div class="row" style="min-height:32px"><button class="link" id="hkReset">기본값으로</button><span class="warn" id="hkMsg"></span></div>
+  <label class="chk" style="margin-top:6px"><input type="checkbox" id="openAtLogin"> Windows 시작 시 자동 실행</label>
+</div>
+
+<footer>
+  <span id="version"></span><span class="sep">·</span>
+  <span id="updateBox"></span><span class="sep">·</span>
+  <span>© 충남삼성고 홍권능</span>
+</footer>
+
+<script src="settings.js"></script>
+</body>
+</html>

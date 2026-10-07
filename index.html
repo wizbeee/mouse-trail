@@ -16,10 +16,29 @@
     top: 0; left: 0;
     /* 실제 크기는 renderer.js에서 displayInfo 기반으로 강제 지정 */
   }
+  #toast {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    padding: 12px 22px;
+    border-radius: 12px;
+    background: rgba(20, 20, 28, 0.82);
+    color: #fff;
+    font: 600 18px "Pretendard", "Malgun Gothic", sans-serif;
+    letter-spacing: -0.2px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  #toast.show { opacity: 1; }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
+<!-- 빛나는 커서·레이저·커서 찾기: 매 프레임 지우고 다시 그림(꼬리 잔상과 분리) -->
+<canvas id="fx"></canvas>
+<div id="toast"></div>
 <script src="renderer.js"></script>
 </body>
 </html>

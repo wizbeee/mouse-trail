@@ -1,26 +1,35 @@
 {
   "name": "mouse-trail",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Glowing mouse trail overlay for Windows",
   "main": "main.js",
-  "author": "wizbeee",
+  "author": "충남삼성고 홍권능",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win nsis"
+    "test": "node test/logic.test.js",
+    "dist": "electron-builder --win nsis",
+    "publish": "electron-builder --win nsis --publish always"
   },
   "devDependencies": {
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   },
   "build": {
     "appId": "com.wizbeee.mousetrail",
     "productName": "Mouse Trail",
     "files": [
       "main.js",
+      "store.js",
       "preload.js",
       "index.html",
       "renderer.js",
+      "settings.html",
+      "settings.js",
+      "settings-preload.js",
       "package.json"
     ],
     "win": {
@@ -34,6 +43,14 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Mouse Trail"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "wizbeee",
+        "repo": "mouse-trail",
+        "releaseType": "release"
+      }
+    ]
   }
 }
