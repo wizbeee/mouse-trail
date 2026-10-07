@@ -32,16 +32,21 @@ t('잘못된 값은 기본값으로', () => {
   const r = S.sanitize({ glow: '999,0,0', life: 'x', halo: 'neon', thickness: 5, hotkeys: { toggle: 3 } });
   assert.strictEqual(r.glow, S.DEFAULTS.glow);
   assert.strictEqual(r.life, 'normal');
-  assert.strictEqual(r.halo, 'soft');
+  assert.strictEqual(r.halo, 'off');
   assert.strictEqual(r.thickness, 'thin');
   assert.strictEqual(r.hotkeys.toggle, 'Control+Shift+F9');
 });
 t('단축키 빈 문자열 = 사용 안 함 유지', () => {
   assert.strictEqual(S.sanitize({ hotkeys: { find: '' } }).hotkeys.find, '');
 });
-t('기본값: 얇게·빛 은은하게·맥박 끔·클릭 표시 끔', () => {
+t('기본값: 1.0 모습(얇게·빛나는 커서 끔·맥박 끔·클릭 표시 끔)', () => {
   const d = S.DEFAULTS;
-  assert.deepStrictEqual([d.thickness, d.halo, d.haloPulse, d.clickMark], ['thin', 'soft', false, 'off']);
+  assert.deepStrictEqual([d.thickness, d.halo, d.haloPulse, d.clickMark], ['thin', 'off', false, 'off']);
+});
+t('첫 1.1.0 빌드가 저장한 은은하게 → 끔으로 한 번만 되돌림', () => {
+  assert.strictEqual(S.sanitize({ halo: 'soft' }).halo, 'off');
+  assert.strictEqual(S.sanitize({ schema: 2, halo: 'soft' }).halo, 'soft');   // 그 뒤 직접 고르면 유지
+  assert.strictEqual(S.sanitize({ halo: 'strong' }).halo, 'strong');
 });
 
 t('발표 모드 켜기 → 굵게·길게·밝은 색·선명하게, 끄면 직전 설정', () => {
@@ -53,6 +58,10 @@ t('발표 모드 켜기 → 굵게·길게·밝은 색·선명하게, 끄면 직
   for (const k of ['glow', 'life', 'thickness', 'halo']) assert.strictEqual(s2[k], s0[k], k);
   assert.strictEqual(s2.presentation, false);
   assert.strictEqual(s2.presentationSnapshot, null);
+});
+t('발표 모드 끄면 은은하게도 그대로 돌아옴(저장·재시작 거쳐도)', () => {
+  const s1 = S.enterPresentation({ ...S.DEFAULTS, halo: 'soft' });
+  assert.strictEqual(S.exitPresentation(S.sanitize(JSON.parse(JSON.stringify(s1)))).halo, 'soft');
 });
 t('발표 모드: 이미 시안이면 색 유지, 클릭 표시 가능하면 켬', () => {
   const s1 = S.enterPresentation({ ...S.DEFAULTS, glow: '120,200,255' }, { clickAvailable: true });

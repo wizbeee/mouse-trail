@@ -23,12 +23,15 @@ const DEFAULT_HOTKEYS = {
   laser:        'Control+Shift+F12',
 };
 
+const SCHEMA = 2;   // 2: 빛나는 커서 기본값을 끔으로(1.0 모습 유지)
+
 const DEFAULTS = {
+  schema: SCHEMA,
   enabled: true,
   glow: '170,140,255',
   life: 'normal',
   thickness: 'thin',
-  halo: 'soft',            // off | soft | strong
+  halo: 'off',             // off | soft | strong — 기본 끔(1.0 모습), 발표 모드에서 선명하게
   haloPulse: false,        // 은은한 맥박 — 기본 꺼짐
   clickMark: 'off',        // off | ripple (A5 승인 전에는 쓰지 않음)
   shape: 'trail',          // trail | laser
@@ -62,6 +65,8 @@ function sanitize(raw) {
   s.life       = oneOf(raw.life, Object.keys(LIFES), d.life);
   s.thickness  = oneOf(raw.thickness, Object.keys(THICKNESS), d.thickness);
   s.halo       = oneOf(raw.halo, ['off', 'soft', 'strong'], d.halo);
+  // 첫 1.1.0 빌드는 '은은하게'를 기본으로 저장했음 → 한 번만 끔으로 되돌림
+  if (raw.schema !== SCHEMA && s.halo === 'soft') s.halo = 'off';
   s.haloPulse  = bool(raw.haloPulse, d.haloPulse);
   s.clickMark  = oneOf(raw.clickMark, ['off', 'ripple'], d.clickMark);
   s.shape      = oneOf(raw.shape, ['trail', 'laser'], d.shape);
@@ -70,7 +75,7 @@ function sanitize(raw) {
   s.presentation = bool(raw.presentation, false);
   if (s.presentation && raw.presentationSnapshot && typeof raw.presentationSnapshot === 'object') {
     const snap = {};
-    const ok = sanitize({ ...raw.presentationSnapshot });   // 같은 규칙으로 검증
+    const ok = sanitize({ ...raw.presentationSnapshot, schema: SCHEMA });   // 같은 규칙으로 검증
     for (const k of PRES_KEYS) snap[k] = ok[k];
     s.presentationSnapshot = snap;
   } else {

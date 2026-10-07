@@ -15,7 +15,7 @@ const settings = {
   core: '255,255,255',
   maxLife: 60,
   thick: 1.0,            // 굵기 배율: 얇게 1.0 / 보통 1.8 / 굵게 3.0
-  halo: 'soft',          // off | soft | strong
+  halo: 'off',           // off | soft | strong
   haloPulse: false,
   shape: 'trail',        // trail | laser
   laserColor: 'red',
@@ -40,12 +40,13 @@ const HALO = {
   soft:   { diameter: 48, alpha: 0.25 },
   strong: { diameter: 72, alpha: 0.40 },
 };
-const HALO_MOVING   = 0.15;   // 움직이는 동안 빛의 세기(꼬리가 주인공)
+// 움직이는 동안에는 빛을 아예 그리지 않음(꼬리만) — 멈추고 꼬리가 거의 사라진 뒤에야 천천히 나타남
 const HALO_IDLE     = 0.35;   // 오래 멈춰 있을 때(화면 가림 방지)
 const HALO_IDLE_MS  = 10000;
 const MOVE_GRACE_MS = 120;    // 마지막 움직임 후 이 시간 지나면 '멈춤'
-const HALO_RISE_MS  = 300;    // 멈춘 뒤 빛이 살아나는 시간
-const HALO_FALL_MS  = 150;
+const HALO_DELAY_MS = 450;    // 멈춘 뒤 이만큼 기다렸다가(꼬리가 먼저 사라지게)
+const HALO_RISE_MS  = 600;    // 이 시간에 걸쳐 부드럽게 나타남
+const HALO_FALL_MS  = 120;    // 다시 움직이면 빠르게 사라짐
 const HALO_DIM_MS   = 1500;   // 오래 멈춤 → 옅어지는 시간
 
 const LASER = {
@@ -320,7 +321,7 @@ function drawHalo(now, dt) {
   const since = now - lastMoveT;
   let target = 0;
   if (cfg && trailOn() && cursor) {
-    target = since < MOVE_GRACE_MS ? HALO_MOVING : since > HALO_IDLE_MS ? HALO_IDLE : 1;
+    target = since < HALO_DELAY_MS ? 0 : since > HALO_IDLE_MS ? HALO_IDLE : 1;
   }
   const ms = target > haloLevel ? HALO_RISE_MS : target === HALO_IDLE ? HALO_DIM_MS : HALO_FALL_MS;
   const step = dt / ms;
@@ -330,7 +331,8 @@ function drawHalo(now, dt) {
   const r = cfg.diameter / 2;
   if (!nearCanvas(cursor.x, cursor.y, r)) return false;
 
-  let a = cfg.alpha * haloLevel;
+  const eased = haloLevel * haloLevel * (3 - 2 * haloLevel);   // 처음과 끝이 부드럽게
+  let a = cfg.alpha * eased;
   if (settings.haloPulse && since >= MOVE_GRACE_MS) {
     a *= 0.85 + 0.15 * Math.sin((now / 2400) * Math.PI * 2);   // 은은한 맥박(선택 시에만)
   }
@@ -344,7 +346,7 @@ function drawHalo(now, dt) {
   fctx.fill();
 
   if (settings.outline) {
-    fctx.strokeStyle = 'rgba(0,0,0,' + 0.10 * haloLevel + ')';
+    fctx.strokeStyle = 'rgba(0,0,0,' + 0.10 * eased + ')';
     fctx.lineWidth = 1.5;
     fctx.beginPath();
     fctx.arc(cursor.x, cursor.y, r * 0.8, 0, Math.PI * 2);

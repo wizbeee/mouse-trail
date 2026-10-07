@@ -71,8 +71,18 @@ module.exports = async function smoke(api) {
   check('꼬리가 그려짐(얇게)', thinCount > 20, `pixels=${thinCount}`);
   fs.writeFileSync(path.join(out, 'trail-thin.png'), g.img.toPNG());
 
-  // 2) 빛나는 커서: 멈추고 0.5초 뒤 커서 자리에 빛, 40px 밖은 비어 있음
-  await sleep(500);
+  // 2) 빛나는 커서: 기본값(끔)이면 멈춰도 빛 없음 = 1.0 모습
+  await sleep(1300);
+  g = await grab();
+  check('기본값은 빛나는 커서 없음(1.0 모습)', sat(g.at(Q.x, Q.y)) === 0, `sat=${sat(g.at(Q.x, Q.y))}`);
+
+  // 은은하게: 움직이는 동안엔 빛 없음, 멈추고 꼬리가 사라진 뒤 빛, 40px 밖은 비어 있음
+  api.update({ halo: 'soft' });
+  await sleep(50);
+  await swipe(Q);
+  g = await grab();
+  check('움직이는 동안 빛 없음', sat(g.at(Q.x + 12, Q.y + 12)) === 0, `sat=${sat(g.at(Q.x + 12, Q.y + 12))}`);
+  await sleep(1300);
   g = await grab();
   const c0 = g.at(Q.x, Q.y), far = g.at(Q.x + 40, Q.y + 40);
   check('멈추면 빛나는 커서(은은하게)', sat(c0) > 15 && sat(far) === 0, `center sat=${sat(c0)} far sat=${sat(far)}`);
@@ -89,7 +99,7 @@ module.exports = async function smoke(api) {
   const thickCount = g.countIn(Q.x - 60, Q.y, 20);
   check('굵게가 얇게보다 굵음', thickCount > thinCount * 1.3, `thin=${thinCount} thick=${thickCount}`);
   fs.writeFileSync(path.join(out, 'trail-thick.png'), g.img.toPNG());
-  await sleep(600);
+  await sleep(1300);
   g = await grab();
   check('선명하게가 은은하게보다 진함', sat(g.at(Q.x, Q.y)) > softS, `soft=${softS} strong=${sat(g.at(Q.x, Q.y))}`);
   fs.writeFileSync(path.join(out, 'halo-strong.png'), g.crop(Q.x, Q.y, 60).toPNG());
