@@ -254,15 +254,34 @@ function drawTrail() {
   const N = points.length;
   if (N < 2) return;
 
+  // 굵기: 가운데 선을 그대로 키우면 흰 막대처럼 진해져서 1.0의 느낌이 사라짐.
+  // → 브레이드(심)는 조금만 키우고(k), 보이는 폭은 꼬리 색의 옅은 빛 띠(body)로 넓힌다.
   const m       = settings.thick;
+  const k       = 1 + (m - 1) * 0.3;          // 심 배율: 얇게 1 / 보통 1.24 / 굵게 1.6
+  const body    = (m - 1) / 2;                // 빛 띠 세기: 얇게 0 / 보통 0.4 / 굵게 1
   const normals = computeNormals();
   const speeds  = computeSpeeds();
-  const strands = STRANDS.map(st => buildStrand(normals, st.offset * m));
+  const strands = STRANDS.map(st => buildStrand(normals, st.offset * k));
 
   ctx.lineCap  = 'round';
   ctx.lineJoin = 'round';
 
-  // 0) 밝은 바탕용 옅은 어두운 테두리 — 가운데 가닥 아래에 한 겹
+  // 0) 꼬리 색 빛 띠 — 보통·굵게에서만. 가장자리가 흐려 선이 아니라 빛으로 보이게
+  if (body > 0 && strands[1]) {
+    const { segs, meta } = strands[1];
+    for (let s = 0; s < STEPS; s++) {
+      if (!segs[s]) continue;
+      const t  = (s + 1) / STEPS;
+      const vf = speedToFactor(avgSpeed(speeds, meta[s].a, meta[s].b));
+      ctx.shadowBlur  = 10 * m;
+      ctx.shadowColor = 'rgba(' + settings.glow + ',0.45)';
+      ctx.strokeStyle = 'rgba(' + settings.glow + ',' + (0.05 + t * 0.13) * vf * body + ')';
+      ctx.lineWidth   = (1.5 + t * 3.5) * vf * m;
+      ctx.stroke(segs[s]);
+    }
+  }
+
+  // 0') 밝은 바탕용 아주 옅은 어두운 테두리 — 가운데 가닥 아래에 한 겹
   if (settings.outline && strands[1]) {
     const { segs, meta } = strands[1];
     ctx.shadowBlur = 0;
@@ -270,8 +289,8 @@ function drawTrail() {
       if (!segs[s]) continue;
       const t  = (s + 1) / STEPS;
       const vf = speedToFactor(avgSpeed(speeds, meta[s].a, meta[s].b));
-      ctx.strokeStyle = 'rgba(0,0,0,' + (0.10 + t * 0.16) * vf + ')';
-      ctx.lineWidth   = (0.40 + t * 1.10) * vf * m + 2.2 * m;
+      ctx.strokeStyle = 'rgba(0,0,0,' + (0.05 + t * 0.09) * vf + ')';
+      ctx.lineWidth   = (0.40 + t * 1.10) * vf * k + 1.6 * k;
       ctx.stroke(segs[s]);
     }
   }
@@ -287,12 +306,12 @@ function drawTrail() {
       if (!segs[s]) continue;
       const t    = (s + 1) / STEPS;                         // 0.2 → 1.0
       const vf   = speedToFactor(avgSpeed(speeds, meta[s].a, meta[s].b));
-      const w    = (0.40 + t * 1.10) * vf * m;              // 얇게 0.4 → 1.5 px (중앙)
+      const w    = (0.40 + t * 1.10) * vf * k;              // 얇게 0.4 → 1.5 px (중앙)
       const a    = (0.18 + t * 0.75) * strand.alphaMult * vf;
       // 꼬리 끝은 설정된 컬러, 헤드는 흰색에 가깝게 (혜성 그라디언트)
       const color = lerpRGB(settings.glow, settings.core, t * t);
 
-      ctx.shadowBlur  = 3.5 * m;
+      ctx.shadowBlur  = 3.5 * k;
       ctx.shadowColor = 'rgba(' + color + ',0.7)';
       ctx.strokeStyle = 'rgba(' + color + ',' + a + ')';
       ctx.lineWidth   = w;
@@ -303,8 +322,8 @@ function drawTrail() {
   // 2) 헤드 스파크 — 커서 끝의 작은 빛점. 느릴 때만 살짝 크게(잉크가 고이는 느낌).
   const head      = points[N - 1];
   const headSpd   = speeds[N - 1];
-  const sparkSize = (0.9 + Math.max(0, 1 - headSpd / 1200) * 1.6) * m;
-  ctx.shadowBlur  = 6 * m;
+  const sparkSize = (0.9 + Math.max(0, 1 - headSpd / 1200) * 1.6) * k;
+  ctx.shadowBlur  = 6 * k;
   ctx.shadowColor = 'rgba(' + settings.core + ',1)';
   ctx.fillStyle   = 'rgba(' + settings.core + ',0.92)';
   ctx.beginPath();
