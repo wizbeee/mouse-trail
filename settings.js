@@ -117,6 +117,7 @@ function render() {
   $('#autoSlideshow').disabled = !state.slideshowAvailable;
   $('#slideshowLabel').classList.toggle('disabled', !state.slideshowAvailable);
   $('#slideshowHint').hidden = state.slideshowAvailable;
+  $('#slideshowOnHint').hidden = !(state.slideshowAvailable && s.autoSlideshow);
   $('#openAtLogin').checked = state.openAtLogin;
 
   renderDisplays();

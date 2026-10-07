@@ -2,6 +2,7 @@ const { app, BrowserWindow, screen, Tray, Menu, nativeImage, ipcMain, globalShor
 const path = require('path');
 const zlib = require('zlib');
 const store = require('./store');
+const { watchSlideshow } = require('./slideshow');
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -21,8 +22,11 @@ let hotkeyStatus = {};        // name -> 'ok' | 'fail' | 'off'
 let hotkeysSuspended = false;
 let updateState = { status: app.isPackaged ? 'idle' : 'dev', version: null };
 
-// 슬라이드 쇼 자동 켜짐(A9)은 승인 후 켬
-const SLIDESHOW_AVAILABLE = false;
+// ── 슬라이드 쇼 자동 켜짐 (A9) ───────────────────────────────
+let slideshowAvailable = process.platform === 'win32';
+let stopSlideWatch = null;
+let slideActive = false;
+let slideTurnedOn = false;    // 슬라이드 쇼 때문에 켰는가 → 끝나면 다시 끔
 
 // ── 클릭 표시 (A5) — 전역 마우스 감지는 네이티브 모듈 필요 ─────
 // 모듈을 못 불러오는 PC(백신 차단 등)에서는 클릭 표시만 꺼지고 나머지는 그대로 동작.
@@ -303,6 +307,7 @@ function update(patch) {
   saveSoon();
   syncPolling();
   syncClickHook();
+  syncSlideshow();
   broadcastSettings();
   rebuildTrayMenu();
   pushState();
@@ -346,6 +351,39 @@ function setPenMode(on, withToast = true) {
   pushState();
 }
 
+// ── 슬라이드 쇼 자동 켜짐 (A9) ───────────────────────────────
+// 시작 때 꺼져 있었으면 켜고, 끝나면 다시 끔. 처음부터 켜져 있었으면 아무것도 안 바꿈.
+function onSlideshow(showing) {
+  if (showing === slideActive) return;
+  slideActive = showing;
+  if (showing && !settings.enabled) {
+    slideTurnedOn = true;
+    setEnabled(true, false);
+    toast('슬라이드 쇼 — 꼬리 효과 켜짐');
+  } else if (!showing && slideTurnedOn) {
+    slideTurnedOn = false;
+    setEnabled(false, false);
+    toast('슬라이드 쇼 끝 — 꼬리 효과 꺼짐');
+  }
+  pushState();
+}
+
+function syncSlideshow() {
+  const want = slideshowAvailable && settings.autoSlideshow;
+  if (want && !stopSlideWatch) {
+    stopSlideWatch = watchSlideshow(onSlideshow, () => {
+      // PowerShell 을 못 띄우는 PC(정책 차단 등) → 이 선택지만 끔
+      stopSlideWatch = null;
+      slideshowAvailable = false;
+      pushState();
+    });
+  } else if (!want && stopSlideWatch) {
+    stopSlideWatch();
+    stopSlideWatch = null;
+    if (slideActive) { slideActive = false; slideTurnedOn = false; }
+  }
+}
+
 // ── 클릭 표시 (A5) ──────────────────────────────────────────
 function syncClickHook() {
   const want = clickAvailable && settings.enabled && settings.clickMark === 'ripple';
@@ -379,7 +417,7 @@ function applyAutoMultiMonitor(withToast) {
 
 // ── 단축키 (A3) ─────────────────────────────────────────────
 const HOTKEY_ACTIONS = {
-  toggle:       () => setEnabled(!settings.enabled, true),
+  toggle:       () => { slideTurnedOn = false; setEnabled(!settings.enabled, true); },
   find:         () => locateCursor(),
   laser:        () => toggleLaser(),
 };
@@ -445,7 +483,8 @@ function stateForWindow() {
     openAtLogin: app.getLoginItemSettings().openAtLogin,
     clickAvailable,
     penMode,
-    slideshowAvailable: SLIDESHOW_AVAILABLE,
+    slideshowAvailable,
+    slideActive,
   };
 }
 
@@ -489,7 +528,7 @@ ipcMain.handle('mts:get-state', () => stateForWindow());
 ipcMain.on('pen-end', () => setPenMode(false));   // 오버레이 위쪽 띠의 [끝내기]
 ipcMain.on('mts:set', (_, patch) => {
   if (!patch || typeof patch !== 'object') return;
-  if ('enabled' in patch) return setEnabled(!!patch.enabled, false);
+  if ('enabled' in patch) { slideTurnedOn = false; return setEnabled(!!patch.enabled, false); }   // 직접 바꾸면 슬라이드 쇼가 끝나도 그대로
   if ('glow' in patch && store.isRGB(patch.glow) && !store.COLORS.some(c => c.val === patch.glow)) {
     // 직접 고른 색은 최근 3개 기억 (B2)
     patch.recentColors = [patch.glow, ...settings.recentColors.filter(c => c !== patch.glow)].slice(0, 3);
@@ -587,6 +626,7 @@ app.whenReady().then(() => {
   applyAutoMultiMonitor(false);
   syncPolling();
   syncClickHook();
+  syncSlideshow();
   setupUpdater();
 
   // 처음 실행 시 설정 창을 한 번 띄워 트레이 위치를 알려 줌
@@ -603,7 +643,7 @@ app.whenReady().then(() => {
   if (process.env.MT_SMOKE) {
     require('./test/smoke')({
       get settings() { return settings; }, overlays, update, setEnabled, toggleLaser, setPenMode, get penMode() { return penMode; },
-      hookEvents: () => hookEvents, get clickAvailable() { return clickAvailable; },
+      hookEvents: () => hookEvents, get slideActive() { return slideActive; }, get clickAvailable() { return clickAvailable; },
       locateCursor, openSettings, get settingsWin() { return settingsWin; }, hotkeyStatus: () => hotkeyStatus,
       SETTINGS_FILE,
     });
@@ -618,6 +658,7 @@ app.on('before-quit', () => {
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   if (hookRunning) { try { uio.stop(); } catch (_) {} }
+  if (stopSlideWatch) stopSlideWatch();
 });
 
 app.on('window-all-closed', (e) => { e.preventDefault && e.preventDefault(); });

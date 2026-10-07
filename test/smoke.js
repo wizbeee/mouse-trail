@@ -3,7 +3,7 @@
 const { screen, app, BrowserWindow } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { execFile } = require('child_process');
+const { execFile, spawn } = require('child_process');
 
 // 캡처 결과가 미리 곱한 알파일 때도, 흰 바탕에 합성될 때도 있어 채도(최대-최소)로 진하기를 잼
 const sat = (p) => Math.max(p.r, p.g, p.b) - Math.min(p.r, p.g, p.b);
@@ -268,6 +268,43 @@ for ($i = 1; $i -le 30; $i++) { [M]::SetCursorPos(${p0.x} + $i * ${step}, ${p0.y
   api.toggleLaser(); const s3 = api.settings.shape + '/' + api.penMode;
   check('단축키 순환 꼬리→레이저→펜→꼬리', s1 === 'laser' && s2 === true && s3 === 'trail/false', `${s1} ${s2} ${s3}`);
   api.update({ clickMark: 'off' });
+
+  // 7-6) 슬라이드 쇼 자동 켜짐: 진짜 PowerPoint 로 빈 슬라이드 쇼를 잠깐 띄움 (MT_SMOKE_NO_PPT=1 이면 건너뜀)
+  if (!process.env.MT_SMOKE_NO_PPT) {
+    api.update({ autoSlideshow: true });
+    api.setEnabled(false, false);
+    await sleep(2500);   // 감시 PowerShell 준비(Add-Type 컴파일)
+    const ppt = `
+$pp = New-Object -ComObject PowerPoint.Application
+$pres = $pp.Presentations.Add($false)
+$null = $pres.Slides.Add(1, 12)
+$null = $pres.SlideShowSettings.Run()
+[Console]::Out.WriteLine('STARTED'); [Console]::Out.Flush()
+Start-Sleep -Milliseconds 4000
+try { $pres.SlideShowWindow.View.Exit() } catch {}
+[Console]::Out.WriteLine('ENDED'); [Console]::Out.Flush()
+Start-Sleep -Milliseconds 300
+try { $pres.Saved = $true; $pres.Close() } catch {}
+try { if ($pp.Presentations.Count -eq 0) { $pp.Quit() } } catch {}
+`;
+    const pf = path.join(out, 'ppt.ps1');
+    fs.writeFileSync(pf, '\ufeff' + ppt, 'utf8');
+    const child = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', pf]);
+    const exited = new Promise(r => child.on('exit', r));   // 일찍 끝나도 놓치지 않게 먼저 걸어 둠
+    let pout = '';
+    child.stdout.on('data', d => { pout += d; });
+    const waitFor = async (word, ms) => { const t0 = Date.now(); while (!pout.includes(word) && Date.now() - t0 < ms) await sleep(100); return pout.includes(word); };
+    const started = await waitFor('STARTED', 30000);
+    await sleep(2500);
+    check('슬라이드 쇼 시작 → 효과 자동 켜짐', started && api.settings.enabled === true && api.slideActive === true, `started=${started} enabled=${api.settings.enabled}`);
+    const ended = await waitFor('ENDED', 15000);
+    await sleep(2500);
+    check('슬라이드 쇼 끝 → 다시 꺼짐', ended && api.settings.enabled === false && api.slideActive === false, `ended=${ended} enabled=${api.settings.enabled}`);
+    await Promise.race([exited, sleep(10000)]);
+    // 처음부터 켜져 있었으면 쇼가 끝나도 그대로
+    api.setEnabled(true, false);
+    api.update({ autoSlideshow: false });
+  }
 
   // 8) 설정 창 화면
   const sw = api.settingsWin;
