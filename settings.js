@@ -3,7 +3,7 @@ const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
 let state = null;
 
-const HK_NAMES = { toggle: '켜기/끄기', find: '커서 찾기', laser: '레이저' };
+const HK_NAMES = { toggle: '켜기/끄기', find: '커서 찾기', laser: '레이저·펜' };
 
 function setAccent(rgb) {
   const [r, g, b] = rgb.split(',').map(Number);
@@ -107,7 +107,8 @@ function render() {
     b.disabled = !state.clickAvailable && b.dataset.v !== 'off';
   }
   $('#clickHint').hidden = state.clickAvailable;
-  $('#laserRow').hidden = s.shape !== 'laser';
+  $('#clickOnHint').hidden = !(state.clickAvailable && s.clickMark === 'ripple');
+  $('#haloOpts').hidden = s.halo === 'off';
 
   $('#haloPulse').checked = s.haloPulse;
   $('#outline').checked = s.outline;
@@ -149,6 +150,7 @@ $('#openAtLogin').onchange = (e) => window.mts.action('setLogin', e.target.check
 $('#dspAll').onclick = () => window.mts.action('displaysAll');
 $('#dspExt').onclick = () => window.mts.action('displaysExternal');
 $('#lightPreview').onchange = (e) => $('#preview').classList.toggle('light', e.target.checked);
+$('#penStart').onclick = () => window.mts.action('pen', true);
 $('#hkReset').onclick = () => { $('#hkMsg').textContent = ''; window.mts.action('resetHotkeys'); };
 
 // ── 단축키 입력받기 ──────────────────────────────────────────

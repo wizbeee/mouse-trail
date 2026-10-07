@@ -6,4 +6,7 @@ contextBridge.exposeInMainWorld('mt', {
   onSettings:    (cb) => ipcRenderer.on('settings',     (_, s)  => cb(s)),
   onToast:       (cb) => ipcRenderer.on('toast',        (_, t)  => cb(t)),
   onLocate:      (cb) => ipcRenderer.on('locate',       (_, l)  => cb(l)),
+  onClick:       (cb) => ipcRenderer.on('click',        (_, c)  => cb(c)),
+  onPen:         (cb) => ipcRenderer.on('pen',          (_, on) => cb(on)),
+  penEnd:        ()   => ipcRenderer.send('pen-end'),
 });

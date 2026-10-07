@@ -16,7 +16,8 @@
     "electron-builder": "^25.1.8"
   },
   "dependencies": {
-    "electron-updater": "^6.8.9"
+    "electron-updater": "^6.8.9",
+    "uiohook-napi": "^1.5.5"
   },
   "build": {
     "appId": "com.wizbeee.mousetrail",
@@ -30,7 +31,9 @@
       "settings.html",
       "settings.js",
       "settings-preload.js",
-      "package.json"
+      "package.json",
+      "!node_modules/uiohook-napi/prebuilds/{darwin,linux}-*/**",
+      "!node_modules/uiohook-napi/prebuilds/win32-arm64/**"
     ],
     "win": {
       "target": "nsis",
@@ -51,6 +54,7 @@
         "repo": "mouse-trail",
         "releaseType": "release"
       }
-    ]
+    ],
+    "npmRebuild": false
   }
 }

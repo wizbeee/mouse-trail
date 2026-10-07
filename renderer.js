@@ -16,6 +16,8 @@ const settings = {
   maxLife: 60,
   thick: 1.0,            // 굵기 배율: 얇게 1.0 / 보통 1.8 / 굵게 3.0
   halo: 'off',           // off | soft | strong
+  haloStyle: 'fade',     // fade 스며들기 | grow 커지며 | ring 퍼지는 원
+  clickMark: 'off',      // off | ripple
   haloPulse: false,
   shape: 'trail',        // trail | laser
   laserColor: 'red',
@@ -37,8 +39,8 @@ const STRANDS = [
 
 // 빛나는 커서 — 교실 프로젝터에서 보고 조정할 시작 수치
 const HALO = {
-  soft:   { diameter: 48, alpha: 0.25 },
-  strong: { diameter: 72, alpha: 0.40 },
+  soft:   { diameter: 72,  alpha: 0.25 },   // 10/7 발주자: 조금 더 크게 (처음 48)
+  strong: { diameter: 104, alpha: 0.40 },
 };
 // 움직이는 동안에는 빛을 아예 그리지 않음(꼬리만) — 멈추고 꼬리가 거의 사라진 뒤에야 천천히 나타남
 const HALO_IDLE     = 0.35;   // 오래 멈춰 있을 때(화면 가림 방지)
@@ -56,6 +58,14 @@ const LASER = {
 const LASER_DIAMETER = 14;
 const LASER_TAIL_MS  = 200;
 
+const RING_PERIOD_MS = 1600;   // 퍼지는 원: 한 번 퍼지는 데 걸리는 시간
+
+const RIPPLE_MS = 400;          // 클릭 파문
+const RIPPLE_R  = 30;
+
+const PEN_HOLD_MS = 2000;       // 레이저 펜: 펜을 뗀 뒤 그대로 있는 시간
+const PEN_FADE_MS = 500;        //            그다음 사라지는 시간
+
 const LOCATE_MS = 600;
 const LOCATE_R0 = 260;
 
@@ -64,6 +74,11 @@ let lastMoveT = -Infinity;
 let haloLevel = 0;
 const laserPts = [];
 const locates = [];
+const ripples = [];
+const penStrokes = [];          // [{ pts: [{x,y}] }]
+let penOn = false;
+let penDown = false;
+let penLastUp = -Infinity;
 
 function sizeCanvas(cv, cx, w, h, sf) {
   cv.width  = Math.floor(w * sf);
@@ -134,6 +149,17 @@ window.mt.onToast(text => {
   toastEl.classList.add('show');
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toastEl.classList.remove('show'), 800);
+});
+
+window.mt.onClick(({ x, y, button }) => {
+  if (!settings.enabled || !settings.active || settings.clickMark !== 'ripple') return;
+  ripples.push({ x: x - origin.x, y: y - origin.y, button, t0: performance.now() });
+});
+
+window.mt.onPen(on => {
+  penOn = on;
+  document.body.classList.toggle('pen', on);
+  if (!on) penUp();   // 쓰던 글씨는 그대로 두었다가 시간이 되면 사라짐
 });
 
 window.mt.onLocate(({ pt, color }) => {
@@ -364,11 +390,15 @@ function drawHalo(now, dt) {
   haloLevel = target > haloLevel ? Math.min(target, haloLevel + step) : Math.max(target, haloLevel - step);
   if (haloLevel < 0.01 || !cfg || !cursor) return false;
 
-  const r = cfg.diameter / 2;
-  if (!nearCanvas(cursor.x, cursor.y, r)) return false;
+  const R = cfg.diameter / 2;
+  if (!nearCanvas(cursor.x, cursor.y, R * 1.3)) return false;
 
   const eased = haloLevel * haloLevel * (3 - 2 * haloLevel);   // 처음과 끝이 부드럽게
-  let a = cfg.alpha * eased;
+  const style = settings.haloStyle;
+  // 커지며: 작은 원에서 제 크기로 / 그 밖: 처음부터 제 크기
+  const r = style === 'grow' ? R * (0.3 + 0.7 * eased) : R;
+  // 퍼지는 원: 가운데 빛은 옅게 깔고 고리가 주인공
+  let a = cfg.alpha * eased * (style === 'ring' ? 0.55 : 1);
   if (settings.haloPulse && since >= MOVE_GRACE_MS) {
     a *= 0.85 + 0.15 * Math.sin((now / 2400) * Math.PI * 2);   // 은은한 맥박(선택 시에만)
   }
@@ -381,6 +411,17 @@ function drawHalo(now, dt) {
   fctx.arc(cursor.x, cursor.y, r, 0, Math.PI * 2);
   fctx.fill();
 
+  // 퍼지는 원: 커서에서 고리가 천천히 퍼지며 옅어짐. 오래 멈추면(10초) 멈춤 — 화면이 계속 움직이지 않게
+  if (style === 'ring' && since < HALO_IDLE_MS) {
+    const p = (((since - HALO_DELAY_MS) % RING_PERIOD_MS) + RING_PERIOD_MS) % RING_PERIOD_MS / RING_PERIOD_MS;
+    const rr = R * (0.2 + 0.95 * (1 - Math.pow(1 - p, 2)));
+    fctx.strokeStyle = 'rgba(' + settings.glow + ',' + cfg.alpha * 2.2 * eased * Math.pow(1 - p, 1.5) + ')';
+    fctx.lineWidth = 2;
+    fctx.beginPath();
+    fctx.arc(cursor.x, cursor.y, rr, 0, Math.PI * 2);
+    fctx.stroke();
+  }
+
   if (settings.outline) {
     fctx.strokeStyle = 'rgba(0,0,0,' + 0.10 * eased + ')';
     fctx.lineWidth = 1.5;
@@ -390,6 +431,102 @@ function drawHalo(now, dt) {
   }
   return true;
 }
+
+// ── 클릭 파문 (A5) — 왼쪽: 퍼지는 원 하나, 오른쪽: 이중 원 ─────────
+function drawRipples(now) {
+  for (let i = ripples.length - 1; i >= 0; i--) {
+    if (now - ripples[i].t0 > RIPPLE_MS) ripples.splice(i, 1);
+  }
+  const color = settings.shape === 'laser' ? (LASER[settings.laserColor] || LASER.red).color : settings.glow;
+  for (const rp of ripples) {
+    if (!nearCanvas(rp.x, rp.y, RIPPLE_R * 2)) continue;
+    const p = (now - rp.t0) / RIPPLE_MS;
+    const e = 1 - Math.pow(1 - p, 3);
+    const a = 1 - p;
+    const rings = rp.button === 2 ? [1, 0.55] : [1];   // uiohook: 1 왼쪽, 2 오른쪽
+    for (const k of rings) {
+      const r = (5 + (RIPPLE_R - 5) * e) * k;
+      if (settings.outline) {
+        fctx.lineWidth = 4.5;
+        fctx.strokeStyle = 'rgba(0,0,0,' + 0.18 * a + ')';
+        fctx.beginPath(); fctx.arc(rp.x, rp.y, r, 0, Math.PI * 2); fctx.stroke();
+      }
+      fctx.lineWidth = 2.5;
+      fctx.strokeStyle = 'rgba(' + color + ',' + 0.9 * a + ')';
+      fctx.beginPath(); fctx.arc(rp.x, rp.y, r, 0, Math.PI * 2); fctx.stroke();
+    }
+    if (p < 0.35) {   // 누른 순간 가운데 옅은 채움
+      fctx.fillStyle = 'rgba(' + color + ',' + 0.25 * (1 - p / 0.35) + ')';
+      fctx.beginPath(); fctx.arc(rp.x, rp.y, 6 + 10 * e, 0, Math.PI * 2); fctx.fill();
+    }
+  }
+}
+
+// ── 레이저 펜 (B6) — 펜을 뗀 뒤 2초 그대로, 0.5초에 걸쳐 함께 사라짐 ─────
+function strokePath(pts) {
+  const path = new Path2D();
+  path.moveTo(pts[0].x, pts[0].y);
+  if (pts.length === 1) { path.lineTo(pts[0].x + 0.01, pts[0].y); return path; }
+  for (let i = 1; i < pts.length - 1; i++) {
+    path.quadraticCurveTo(pts[i].x, pts[i].y, (pts[i].x + pts[i + 1].x) / 2, (pts[i].y + pts[i + 1].y) / 2);
+  }
+  path.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+  return path;
+}
+
+function drawPen(now) {
+  if (!penStrokes.length) return false;
+  let k = 1;
+  if (!penDown) {
+    const t = now - penLastUp - PEN_HOLD_MS;
+    if (t > 0) k = 1 - t / PEN_FADE_MS;
+  }
+  if (k <= 0) { penStrokes.length = 0; return false; }
+  const L = LASER[settings.laserColor] || LASER.red;
+  fctx.lineCap = 'round';
+  fctx.lineJoin = 'round';
+  const paths = penStrokes.map(st => strokePath(st.pts));
+  if (settings.outline) {
+    fctx.strokeStyle = 'rgba(0,0,0,' + 0.18 * k + ')';
+    fctx.lineWidth = 7;
+    for (const p of paths) fctx.stroke(p);
+  }
+  fctx.shadowBlur  = 12;
+  fctx.shadowColor = 'rgba(' + L.color + ',' + 0.8 * k + ')';
+  fctx.strokeStyle = 'rgba(' + L.color + ',' + 0.95 * k + ')';
+  fctx.lineWidth = 4;
+  for (const p of paths) fctx.stroke(p);
+  fctx.shadowBlur  = 0;
+  fctx.strokeStyle = 'rgba(' + L.core + ',' + 0.85 * k + ')';
+  fctx.lineWidth = 1.3;
+  for (const p of paths) fctx.stroke(p);
+  return true;
+}
+
+function penPoint(e) { return { x: e.clientX, y: e.clientY }; }
+
+addEventListener('pointerdown', (e) => {
+  if (!penOn || e.button !== 0 || e.target.closest('#penBar')) return;
+  penDown = true;
+  penStrokes.push({ pts: [penPoint(e)] });
+  try { document.body.setPointerCapture(e.pointerId); } catch (_) {}
+});
+addEventListener('pointermove', (e) => {
+  if (!penOn || !penDown) return;
+  const st = penStrokes[penStrokes.length - 1];
+  const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+  for (const ce of (evs.length ? evs : [e])) {
+    const p = penPoint(ce), q = st.pts[st.pts.length - 1];
+    if ((p.x - q.x) ** 2 + (p.y - q.y) ** 2 >= 1) st.pts.push(p);
+  }
+});
+const penUp = () => { if (penDown) { penDown = false; penLastUp = performance.now(); } };
+addEventListener('pointerup', penUp);
+addEventListener('pointercancel', penUp);
+addEventListener('contextmenu', (e) => { if (penOn) e.preventDefault(); });
+
+const penEndBtn = document.getElementById('penEnd');
+if (penEndBtn) penEndBtn.addEventListener('click', () => window.mt.penEnd());
 
 // ── 레이저 포인터 (B5) ───────────────────────────────────────
 function drawLaser(now) {
@@ -486,6 +623,8 @@ function loop() {
   if (fxDirty) { clearCanvas(fxCanvas, fctx); fxDirty = false; }
   if (drawHalo(now, dt)) fxDirty = true;
   if (laserOn() && drawLaser(now)) fxDirty = true;
+  if (ripples.length) { drawRipples(now); fxDirty = true; }
+  if (drawPen(now)) fxDirty = true;
   if (locates.length) { drawLocates(now); fxDirty = true; }
 
   requestAnimationFrame(loop);

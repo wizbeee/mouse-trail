@@ -31,8 +31,9 @@ const DEFAULTS = {
   life: 'normal',
   thickness: 'thin',
   halo: 'off',             // off | soft | strong — 기본 끔(1.0 모습)
+  haloStyle: 'fade',       // fade(스며들기) | grow(커지며) | ring(퍼지는 원)
   haloPulse: false,        // 은은한 맥박 — 기본 꺼짐
-  clickMark: 'off',        // off | ripple (A5 승인 전에는 쓰지 않음)
+  clickMark: 'off',        // off | ripple
   shape: 'trail',          // trail | laser
   laserColor: 'red',       // red | green
   outline: false,          // 밝은 바탕용 테두리 항상 켜기 (B4 대체안)
@@ -70,6 +71,7 @@ function sanitize(raw) {
   s.halo       = oneOf(raw.halo, ['off', 'soft', 'strong'], d.halo);
   // 첫 1.1.0 빌드는 '은은하게'를 기본으로 저장했음 → 한 번만 끔으로 되돌림
   if (raw.schema !== SCHEMA && s.halo === 'soft') s.halo = 'off';
+  s.haloStyle  = oneOf(raw.haloStyle, ['fade', 'grow', 'ring'], d.haloStyle);
   s.haloPulse  = bool(raw.haloPulse, d.haloPulse);
   s.clickMark  = oneOf(raw.clickMark, ['off', 'ripple'], d.clickMark);
   s.shape      = oneOf(raw.shape, ['trail', 'laser'], d.shape);

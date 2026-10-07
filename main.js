@@ -21,9 +21,22 @@ let hotkeyStatus = {};        // name -> 'ok' | 'fail' | 'off'
 let hotkeysSuspended = false;
 let updateState = { status: app.isPackaged ? 'idle' : 'dev', version: null };
 
-// 클릭 표시(A5)·슬라이드 쇼 자동 켜짐(A9)은 시험 결과 보고 후 승인 시 켬
-const CLICK_AVAILABLE = false;
+// 슬라이드 쇼 자동 켜짐(A9)은 승인 후 켬
 const SLIDESHOW_AVAILABLE = false;
+
+// ── 클릭 표시 (A5) — 전역 마우스 감지는 네이티브 모듈 필요 ─────
+// 모듈을 못 불러오는 PC(백신 차단 등)에서는 클릭 표시만 꺼지고 나머지는 그대로 동작.
+let uio = null;
+let clickAvailable = false;
+let hookRunning = false;
+let hookEvents = 0;           // 시험용: 감지한 클릭 수
+try {
+  uio = require('uiohook-napi').uIOhook;
+  clickAvailable = true;
+} catch (_) { uio = null; }
+
+// 레이저 펜 (B6) — 쓰는 동안만 오버레이가 마우스를 받음. 저장하지 않음(다시 켜면 늘 꺼진 상태)
+let penMode = false;
 
 let settings = store.load(SETTINGS_FILE);   // 옛 판 값(발표 모드 등)은 여기서 정리됨 → 시작 때 한 번 다시 저장
 
@@ -124,6 +137,8 @@ function overlaySettings(display) {
     thick:     store.THICKNESS[settings.thickness],
     halo:      settings.halo,
     haloPulse: settings.haloPulse,
+    haloStyle: settings.haloStyle,
+    clickMark: settings.clickMark,
     shape:     settings.shape,
     laserColor: settings.laserColor,
     outline:   settings.outline,
@@ -184,6 +199,7 @@ function createOverlayForDisplay(display) {
     win.webContents.send('settings', overlaySettings(display));
     // 커서가 멈춰 있어도 빛나는 커서가 보이도록 현재 위치를 한 번 보냄
     win.webContents.send('cursor', screen.getCursorScreenPoint());
+    if (penMode) applyPenToOverlay(win);   // 펜 쓰는 중에 모니터가 바뀐 경우
   });
 
   win.mtDisplay = display;
@@ -286,6 +302,7 @@ function update(patch) {
   }
   saveSoon();
   syncPolling();
+  syncClickHook();
   broadcastSettings();
   rebuildTrayMenu();
   pushState();
@@ -293,14 +310,64 @@ function update(patch) {
 
 function setEnabled(on, withToast) {
   if (settings.enabled === on) return;
+  if (!on) setPenMode(false);
   update({ enabled: on });
   if (withToast) toast(on ? '꼬리 효과 켜짐' : '꼬리 효과 꺼짐');
 }
 
+// 단축키를 누를 때마다 꼬리 → 레이저 포인터 → 레이저 펜 → 꼬리
 function toggleLaser() {
-  const laser = settings.shape !== 'laser';
-  update({ shape: laser ? 'laser' : 'trail', enabled: true });
-  toast(laser ? '레이저 포인터' : '꼬리 모드');
+  if (penMode) {
+    setPenMode(false, false);
+    update({ shape: 'trail' });
+    toast('꼬리 모드');
+  } else if (settings.shape !== 'laser') {
+    update({ shape: 'laser', enabled: true });
+    toast('레이저 포인터');
+  } else {
+    if (!settings.enabled) update({ enabled: true });
+    setPenMode(true);
+  }
+}
+
+// ── 레이저 펜 (B6) ──────────────────────────────────────────
+function applyPenToOverlay(win) {
+  if (!win || win.isDestroyed()) return;
+  win.setIgnoreMouseEvents(!penMode);
+  win.webContents.send('pen', penMode);
+}
+
+function setPenMode(on, withToast = true) {
+  if (penMode === on) return;
+  penMode = on;
+  for (const win of overlays.values()) applyPenToOverlay(win);
+  registerHotkeys();   // 펜 동안만 Esc 를 잡음
+  if (withToast) toast(on ? '레이저 펜 · Esc로 끝내기' : '레이저 펜 끝');
+  pushState();
+}
+
+// ── 클릭 표시 (A5) ──────────────────────────────────────────
+function syncClickHook() {
+  const want = clickAvailable && settings.enabled && settings.clickMark === 'ripple';
+  if (want && !hookRunning) {
+    try { uio.start(); hookRunning = true; }
+    catch (_) { clickAvailable = false; pushState(); }
+  } else if (!want && hookRunning) {
+    try { uio.stop(); } catch (_) {}
+    hookRunning = false;
+  }
+}
+
+if (uio) {
+  uio.on('mousedown', (e) => {
+    hookEvents++;
+    if (penMode) return;   // 펜으로 쓰는 중에는 파문 없음
+    // 훅 좌표는 실제 픽셀 → 화면 배율을 반영한 좌표로
+    const pt = process.platform === 'win32' ? screen.screenToDipPoint({ x: e.x, y: e.y }) : { x: e.x, y: e.y };
+    for (const win of overlays.values()) {
+      if (win && !win.isDestroyed()) win.webContents.send('click', { x: pt.x, y: pt.y, button: e.button });
+    }
+  });
 }
 
 // ── 자동 켜짐 (A9: 모니터 2대 이상) ──────────────────────────
@@ -327,6 +394,9 @@ function registerHotkeys() {
     let ok = false;
     try { ok = globalShortcut.register(acc, fn); } catch (_) { ok = false; }
     hotkeyStatus[name] = ok ? 'ok' : 'fail';
+  }
+  if (penMode) {
+    try { globalShortcut.register('Escape', () => setPenMode(false)); } catch (_) {}
   }
 }
 
@@ -373,7 +443,8 @@ function stateForWindow() {
     version: app.getVersion(),
     update: updateState,
     openAtLogin: app.getLoginItemSettings().openAtLogin,
-    clickAvailable: CLICK_AVAILABLE,
+    clickAvailable,
+    penMode,
     slideshowAvailable: SLIDESHOW_AVAILABLE,
   };
 }
@@ -415,6 +486,7 @@ function openSettings({ firstRun = false } = {}) {
 }
 
 ipcMain.handle('mts:get-state', () => stateForWindow());
+ipcMain.on('pen-end', () => setPenMode(false));   // 오버레이 위쪽 띠의 [끝내기]
 ipcMain.on('mts:set', (_, patch) => {
   if (!patch || typeof patch !== 'object') return;
   if ('enabled' in patch) return setEnabled(!!patch.enabled, false);
@@ -446,6 +518,7 @@ ipcMain.handle('mts:action', (_, name, arg) => {
     case 'resetHotkeys':
       return update({ hotkeys: { ...store.DEFAULT_HOTKEYS } });
     case 'locate':        return locateCursor();
+    case 'pen':           if (!settings.enabled) update({ enabled: true }); return setPenMode(!!arg);
     case 'checkUpdate':   return checkForUpdates();
     case 'installUpdate': if (autoUpdater && updateState.status === 'ready') autoUpdater.quitAndInstall(); return;
   }
@@ -513,6 +586,7 @@ app.whenReady().then(() => {
   registerHotkeys();
   applyAutoMultiMonitor(false);
   syncPolling();
+  syncClickHook();
   setupUpdater();
 
   // 처음 실행 시 설정 창을 한 번 띄워 트레이 위치를 알려 줌
@@ -528,7 +602,8 @@ app.whenReady().then(() => {
 
   if (process.env.MT_SMOKE) {
     require('./test/smoke')({
-      get settings() { return settings; }, overlays, update, setEnabled, toggleLaser,
+      get settings() { return settings; }, overlays, update, setEnabled, toggleLaser, setPenMode, get penMode() { return penMode; },
+      hookEvents: () => hookEvents, get clickAvailable() { return clickAvailable; },
       locateCursor, openSettings, get settingsWin() { return settingsWin; }, hotkeyStatus: () => hotkeyStatus,
       SETTINGS_FILE,
     });
@@ -540,6 +615,9 @@ app.on('before-quit', () => {
   saveNow();
   destroyAllOverlays();
 });
-app.on('will-quit', () => globalShortcut.unregisterAll());
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+  if (hookRunning) { try { uio.stop(); } catch (_) {} }
+});
 
 app.on('window-all-closed', (e) => { e.preventDefault && e.preventDefault(); });

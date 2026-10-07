@@ -1,6 +1,6 @@
 // 실제 Electron 에서 오버레이가 무엇을 그리는지 확인하는 연기 시험.
 // 실행: MT_SMOKE=1 MT_SETTINGS_FILE=<임시 경로> MT_SMOKE_OUT=<그림 저장 폴더> npx electron .
-const { screen, app } = require('electron');
+const { screen, app, BrowserWindow } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { execFile } = require('child_process');
@@ -115,7 +115,7 @@ module.exports = async function smoke(api) {
   console.log('k', g.k, 'center', JSON.stringify(g.at(Q.x, Q.y + 1)));
   check('레이저 빨간 점', lp.r - lp.g > 100, JSON.stringify(lp));
   fs.writeFileSync(path.join(out, 'laser.png'), g.crop(Q.x, Q.y, 40).toPNG());
-  api.toggleLaser();
+  api.update({ shape: 'trail' });   // 단축키를 한 번 더 누르면 이제 펜이 되므로 직접 되돌림
 
   // 5) 효과 끔 → 아무것도 안 그림, 커서 찾기는 동작
   api.setEnabled(false, true);
@@ -155,6 +155,119 @@ module.exports = async function smoke(api) {
   await sleep(300);
   check('Ctrl+Shift+F9 로 켜기/끄기', api.settings.enabled === !before);
   api.setEnabled(true, false);
+
+  // 7-1) 빛나는 커서 크기: 은은하게 지름 72 → 반지름 30px 자리에도 빛이 있음
+  api.update({ halo: 'soft', haloStyle: 'fade' });
+  await swipe(Q);
+  await sleep(1300);
+  g = await grab();
+  check('빛나는 커서가 더 큼(30px 떨어진 곳에도 빛)', sat(g.at(Q.x + 30, Q.y)) > 0, `sat=${sat(g.at(Q.x + 30, Q.y))}`);
+  fs.writeFileSync(path.join(out, 'halo-fade.png'), g.crop(Q.x, Q.y, 70).toPNG());
+
+  // 7-2) 커지며: 나타나는 도중에는 원이 작음 → 바깥쪽이 아직 비어 있음
+  api.update({ haloStyle: 'grow' });
+  await swipe(Q);
+  await sleep(700);   // 0.45초 기다린 뒤 0.25초쯤 — 아직 커지는 중
+  g = await grab();
+  const growMid = sat(g.at(Q.x + 30, Q.y));
+  await sleep(700);
+  g = await grab();
+  const growEnd = sat(g.at(Q.x + 30, Q.y));
+  check('커지며: 처음엔 작았다가 커짐', growMid < growEnd, `중간=${growMid} 끝=${growEnd}`);
+  fs.writeFileSync(path.join(out, 'halo-grow.png'), g.crop(Q.x, Q.y, 70).toPNG());
+
+  // 7-3) 퍼지는 원: 고리가 보임(가운데 빛 바깥에 선)
+  api.update({ haloStyle: 'ring' });
+  await swipe(Q);
+  await sleep(1300);
+  const ringShots = [];
+  for (let i = 0; i < 4; i++) { ringShots.push(await grab()); await sleep(200); }
+  const ringVar = new Set(ringShots.map(x => x.countIn(Q.x, Q.y, 60))).size;
+  check('퍼지는 원: 멈춰 있는 동안 모양이 바뀜(고리가 퍼짐)', ringVar > 1, `서로 다른 장면 ${ringVar}/4`);
+  fs.writeFileSync(path.join(out, 'halo-ring.png'), ringShots[1].crop(Q.x, Q.y, 70).toPNG());
+  api.update({ halo: 'off', haloStyle: 'fade' });
+
+  // 7-4) 클릭 파문: 오버레이에 클릭을 보내면 고리가 그려짐(왼쪽 하나, 오른쪽 이중)
+  api.update({ clickMark: 'ripple' });
+  await sleep(100);
+  check('클릭 감지 모듈 불러옴', api.clickAvailable === true);
+  const R2 = { x: Q.x + 150, y: Q.y };
+  win.webContents.send('click', { x: R2.x, y: R2.y, button: 1 });
+  await sleep(120);
+  g = await grab();
+  const rip = g.countIn(R2.x, R2.y, 40);
+  check('왼쪽 클릭 파문', rip > 40, `pixels=${rip}`);
+  fs.writeFileSync(path.join(out, 'ripple-left.png'), g.crop(R2.x, R2.y, 45).toPNG());
+  await sleep(400);
+  win.webContents.send('click', { x: R2.x, y: R2.y, button: 2 });
+  await sleep(160);
+  g = await grab();
+  fs.writeFileSync(path.join(out, 'ripple-right.png'), g.crop(R2.x, R2.y, 45).toPNG());
+  await sleep(400);
+  g = await grab();
+  check('파문은 0.4초 뒤 사라짐', g.countIn(R2.x, R2.y, 40) === 0);
+
+  // 7-5) 레이저 펜: 진짜 마우스로 끌어 쓰기. 오버레이가 받지 못하면 밑의 시험 창이 클릭을 받음 → 실패로 잡힘
+  const target = new BrowserWindow({ x: Math.round(Q.x - 200), y: Math.round(Q.y - 120), width: 400, height: 240, show: false, frame: false, backgroundColor: '#ffffff' });
+  await target.loadURL('data:text/html,<body style="margin:0;height:100vh" onpointerdown="window.hit=(window.hit||0)+1"></body>');
+  target.showInactive();
+  await sleep(300);
+  const hooksBefore = api.hookEvents();
+  api.setPenMode(true);
+  await sleep(300);
+  check('펜 켜짐', api.penMode === true);
+  const p0 = screen.dipToScreenPoint({ x: Q.x - 120, y: Q.y });
+  const step = Math.round(screen.dipToScreenPoint({ x: Q.x - 112, y: Q.y }).x - p0.x);   // 8 DIP 의 실제 픽셀
+  const ps = `
+Add-Type @"
+using System; using System.Runtime.InteropServices;
+public static class M {
+  [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+  [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT p);
+  [DllImport("user32.dll")] public static extern void mouse_event(uint f, int dx, int dy, uint d, IntPtr e);
+  public struct POINT { public int X; public int Y; }
+}
+"@
+[M]::SetProcessDPIAware() | Out-Null
+$o = New-Object M+POINT; [M]::GetCursorPos([ref]$o) | Out-Null
+[M]::SetCursorPos(${p0.x}, ${p0.y}) | Out-Null; Start-Sleep -Milliseconds 60
+[M]::mouse_event(2, 0, 0, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds 30
+for ($i = 1; $i -le 30; $i++) { [M]::SetCursorPos(${p0.x} + $i * ${step}, ${p0.y} + [int](30 * [Math]::Sin($i / 5))) | Out-Null; Start-Sleep -Milliseconds 12 }
+[M]::mouse_event(4, 0, 0, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds 60
+[M]::SetCursorPos($o.X, $o.Y) | Out-Null
+`;
+  const psFile = path.join(out, 'drag.ps1');
+  fs.writeFileSync(psFile, '\ufeff' + ps, 'utf8');
+  await new Promise(r => execFile('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', psFile], r));
+  await sleep(150);
+  g = await grab();
+  const penPx = g.countIn(Q.x, Q.y, 140);
+  check('레이저 펜으로 쓴 선이 보임', penPx > 300, `pixels=${penPx}`);
+  fs.writeFileSync(path.join(out, 'pen.png'), g.crop(Q.x, Q.y, 140).toPNG());
+  const hit = await target.webContents.executeJavaScript('window.hit || 0');
+  check('펜으로 쓸 때 밑의 프로그램은 클릭을 받지 않음', hit === 0, `밑 창 클릭 ${hit}회`);
+  check('클릭 감지 모듈이 실제 클릭을 받음', api.hookEvents() > hooksBefore, `${hooksBefore} → ${api.hookEvents()}`);
+
+  // Esc 로 끝 → 2.5초 뒤 글씨 사라짐
+  await new Promise(r => execFile('powershell', ['-NoProfile', '-Command',
+    "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('{ESC}')"], r));
+  await sleep(300);
+  check('Esc 로 펜 끝', api.penMode === false);
+  g = await grab();
+  check('펜을 끝내도 글씨는 잠시 남음', g.countIn(Q.x, Q.y, 140) > 300);
+  await sleep(2600);
+  g = await grab();
+  check('2.5초 뒤 글씨 사라짐', g.countIn(Q.x, Q.y, 140) === 0);
+  target.destroy();
+
+  // 단축키 순환: 꼬리 → 레이저 → 펜 → 꼬리
+  api.update({ shape: 'trail' });
+  api.toggleLaser(); const s1 = api.settings.shape;
+  api.toggleLaser(); const s2 = api.penMode;
+  api.toggleLaser(); const s3 = api.settings.shape + '/' + api.penMode;
+  check('단축키 순환 꼬리→레이저→펜→꼬리', s1 === 'laser' && s2 === true && s3 === 'trail/false', `${s1} ${s2} ${s3}`);
+  api.update({ clickMark: 'off' });
 
   // 8) 설정 창 화면
   const sw = api.settingsWin;
