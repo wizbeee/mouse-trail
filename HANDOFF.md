@@ -44,6 +44,9 @@
 ## 1.1.3 (10/7)
 - 레이저 펜이 **손가락·펜(터치스크린)으로 안 써지던 것** 고침: 브라우저 기본 동작이 끌기를 화면 밀기로 가져가 pointercancel → 펜 모드에서 `touch-action: none`. 시험 `npx electron test/look/pen-touch.js`(숨은 창에서 CDP 로 터치 흉내).
 
+## 1.1.4 (10/7, 설치만 · GitHub 배포는 발주자 확인 뒤)
+- **펜 단추**: 화면 구석에 늘 떠 있는 44px 단추(pen-button.html). 누르면 펜 켜기/끄기, 4px 넘게 끌면 옮기고 자리 저장. focusable:false 라 PowerPoint 초점 안 뺏음, 펜 동안에도 오버레이 위(screen-saver 2 + moveTop). 설정 「화면 구석에 펜 단추 늘 띄우기」 기본 켜짐. 시험 `npx electron test/look/penbtn.js`(숨은 창). 🔴 실제 화면에서 펜 켠 뒤에도 단추가 눌리는지는 발주자 확인 필요.
+
 ## 알아 둘 것
 - Word: Ctrl+Shift+F9(필드 연결 끊기)·F11(필드 잠금 해제)·F12(인쇄)와 겹침. 앱이 가로챔.
 - 시험 실행 시 `MT_SETTINGS_FILE` 로 임시 설정 파일을 써서 실제 설정을 건드리지 않음.

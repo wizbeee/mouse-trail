@@ -206,6 +206,7 @@ function createOverlayForDisplay(display) {
     // 커서가 멈춰 있어도 빛나는 커서가 보이도록 현재 위치를 한 번 보냄
     win.webContents.send('cursor', screen.getCursorScreenPoint());
     if (penMode) applyPenToOverlay(win);   // 펜 쓰는 중에 모니터가 바뀐 경우
+    raisePenButton();                      // 새 오버레이가 펜 단추를 덮지 않게
   });
 
   win.mtDisplay = display;
@@ -233,6 +234,7 @@ function refitDebounced() {
   refitTimer = setTimeout(() => {
     refitTimer = null;
     setupOverlays();
+    syncPenButton();   // 모니터가 빠졌으면 주 화면으로
     applyAutoMultiMonitor(true);
     pushState();
   }, 250);
@@ -310,6 +312,8 @@ function update(patch) {
   syncPolling();
   syncClickHook();
   syncSlideshow();
+  if (before.penButton !== settings.penButton) syncPenButton();
+  sendPenBtnState();
   broadcastSettings();
   rebuildTrayMenu();
   pushState();
@@ -349,9 +353,81 @@ function setPenMode(on, withToast = true) {
   penMode = on;
   registerHotkeys();   // 펜 동안만 Esc 를 잡음
   for (const win of overlays.values()) applyPenToOverlay(win);
+  raisePenButton();
+  sendPenBtnState();
   if (withToast) toast(on ? (penEscOk ? '레이저 펜 · Esc로 끝내기' : '레이저 펜 · [끝내기]로 마침') : '레이저 펜 끝');
   pushState();
 }
+
+// ── 펜 단추 — 화면 구석에 늘 떠 있는 작은 단추. 누르면 펜 켜기/끄기, 끌면 옮김 ─────
+// 펜 동안에도 오버레이보다 위에 있어야 끌 수 있음. 초점을 가져가지 않아 PowerPoint 등이 그대로 앞에 있음.
+const PEN_BTN = 44;
+let penBtn = null;
+
+function penButtonColor() {
+  return settings.laserColor === 'green' ? '40,200,90' : '235,50,50';
+}
+
+function sendPenBtnState() {
+  if (penBtn && !penBtn.isDestroyed()) penBtn.webContents.send('penbtn:state', { on: penMode, color: penButtonColor() });
+}
+
+function raisePenButton() {
+  if (penBtn && !penBtn.isDestroyed()) { penBtn.setAlwaysOnTop(true, 'screen-saver', 2); penBtn.moveTop(); }
+}
+
+function syncPenButton() {
+  if (!settings.penButton) {
+    if (penBtn && !penBtn.isDestroyed()) penBtn.destroy();
+    penBtn = null;
+    return;
+  }
+  const primaryId = screen.getPrimaryDisplay().id;
+  const list = screen.getAllDisplays().map(d => ({ workArea: d.workArea, primary: d.id === primaryId }));
+  const p = store.penButtonPlace(settings.penButtonPos, list, PEN_BTN);
+  if (penBtn && !penBtn.isDestroyed()) {
+    penBtn.setBounds({ x: p.x, y: p.y, width: PEN_BTN, height: PEN_BTN });
+    raisePenButton();
+    return;
+  }
+  penBtn = new BrowserWindow({
+    x: p.x, y: p.y, width: PEN_BTN, height: PEN_BTN,
+    show: false, frame: false, transparent: true, resizable: false,
+    minimizable: false, maximizable: false, fullscreenable: false,
+    skipTaskbar: true, focusable: false, hasShadow: false, alwaysOnTop: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'pen-button-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  penBtn.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  penBtn.loadFile(path.join(__dirname, 'pen-button.html'));
+  penBtn.once('ready-to-show', () => {
+    if (!penBtn || penBtn.isDestroyed()) return;
+    penBtn.setBounds({ x: p.x, y: p.y, width: PEN_BTN, height: PEN_BTN });   // 혼합 배율 화면 보정
+    penBtn.showInactive();
+    raisePenButton();
+    sendPenBtnState();
+  });
+  penBtn.on('closed', () => { penBtn = null; });
+}
+
+ipcMain.on('penbtn:toggle', () => {
+  if (penMode) return setPenMode(false);
+  if (!settings.enabled) update({ enabled: true });
+  setPenMode(true);
+});
+ipcMain.on('penbtn:move', (_, dx, dy) => {
+  if (!penBtn || penBtn.isDestroyed()) return;
+  const [x, y] = penBtn.getPosition();
+  penBtn.setBounds({ x: x + Math.round(dx), y: y + Math.round(dy), width: PEN_BTN, height: PEN_BTN });
+});
+ipcMain.on('penbtn:moved', () => {
+  if (!penBtn || penBtn.isDestroyed()) return;
+  const [x, y] = penBtn.getPosition();
+  update({ penButtonPos: { x, y } });
+});
 
 // ── 슬라이드 쇼 자동 켜짐 (A9) ───────────────────────────────
 // 시작 때 꺼져 있었으면 켜고, 끝나면 다시 끔. 처음부터 켜져 있었으면 아무것도 안 바꿈.
@@ -645,6 +721,7 @@ app.whenReady().then(() => {
   syncPolling();
   syncClickHook();
   syncSlideshow();
+  syncPenButton();
   setupUpdater();
 
   // 처음 실행 시 설정 창을 한 번 띄워 트레이 위치를 알려 줌
@@ -672,6 +749,7 @@ app.whenReady().then(() => {
 app.on('before-quit', () => {
   saveNow();
   destroyAllOverlays();
+  if (penBtn && !penBtn.isDestroyed()) penBtn.destroy();
 });
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();

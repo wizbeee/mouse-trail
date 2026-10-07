@@ -112,6 +112,7 @@ function render() {
 
   $('#haloPulse').checked = s.haloPulse;
   $('#outline').checked = s.outline;
+  $('#penButton').checked = s.penButton;
   $('#autoMultiMonitor').checked = s.autoMultiMonitor;
   $('#autoSlideshow').checked = s.autoSlideshow;
   $('#autoSlideshow').disabled = !state.slideshowAvailable;
@@ -144,7 +145,7 @@ for (const seg of $$('.seg')) {
     window.mts.set({ [seg.dataset.key]: b.dataset.v });
   });
 }
-for (const id of ['haloPulse', 'outline', 'autoMultiMonitor', 'autoSlideshow']) {
+for (const id of ['haloPulse', 'outline', 'autoMultiMonitor', 'autoSlideshow', 'penButton']) {
   $('#' + id).onchange = (e) => window.mts.set({ [id]: e.target.checked });
 }
 $('#openAtLogin').onchange = (e) => window.mts.action('setLogin', e.target.checked);

@@ -42,6 +42,8 @@ const DEFAULTS = {
   autoMultiMonitor: false,
   autoSlideshow: false,
   hotkeys: { ...DEFAULT_HOTKEYS },
+  penButton: true,         // 화면 구석 펜 단추 (10/7 발주자: 켜고 끄기 + 늘 보이는 단추)
+  penButtonPos: null,      // { x, y } — 끌어서 옮긴 자리
   firstRunShown: false,
 };
 
@@ -92,6 +94,9 @@ function sanitize(raw) {
     s.hotkeys[k] = typeof hk[k] === 'string' ? hk[k] : DEFAULT_HOTKEYS[k];
   }
   s.firstRunShown = bool(raw.firstRunShown, false);
+  s.penButton = bool(raw.penButton, d.penButton);
+  const pp = raw.penButtonPos;
+  s.penButtonPos = pp && Number.isFinite(pp.x) && Number.isFinite(pp.y) ? { x: Math.round(pp.x), y: Math.round(pp.y) } : null;
   return s;
 }
 
@@ -135,6 +140,18 @@ function resolveDisplays(cfg, displays) {
   return { cfg: c, active: new Set(active) };
 }
 
+// 펜 단추 자리: 저장된 자리가 어느 화면 작업 영역 안에 통째로 들어가면 그대로, 아니면 주 화면 오른쪽 아래
+// displays: [{ workArea: {x,y,width,height}, primary }]
+function penButtonPlace(pos, displays, size, margin = 16) {
+  if (pos) {
+    const inside = displays.some(({ workArea: w }) =>
+      pos.x >= w.x && pos.y >= w.y && pos.x + size <= w.x + w.width && pos.y + size <= w.y + w.height);
+    if (inside) return { x: pos.x, y: pos.y };
+  }
+  const w = (displays.find(d => d.primary) || displays[0]).workArea;
+  return { x: w.x + w.width - size - margin, y: w.y + w.height - size - margin };
+}
+
 function colorName(rgb) {
   const c = COLORS.find(x => x.val === rgb);
   return c ? c.name : '직접 고른 색';
@@ -142,5 +159,5 @@ function colorName(rgb) {
 
 module.exports = {
   COLORS, LIFES, LIFE_NAMES, THICKNESS, DEFAULTS, DEFAULT_HOTKEYS,
-  sanitize, load, save, resolveDisplays, colorName, isRGB,
+  sanitize, load, save, resolveDisplays, penButtonPlace, colorName, isRGB,
 };

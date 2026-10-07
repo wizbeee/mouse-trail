@@ -1,6 +1,6 @@
 {
   "name": "mouse-trail",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "description": "Glowing mouse trail overlay for Windows",
   "main": "main.js",
   "author": "충남삼성고 홍권능",
@@ -32,6 +32,8 @@
       "settings.html",
       "settings.js",
       "settings-preload.js",
+      "pen-button.html",
+      "pen-button-preload.js",
       "package.json",
       "!node_modules/uiohook-napi/prebuilds/{darwin,linux}-*/**",
       "!node_modules/uiohook-napi/prebuilds/win32-arm64/**"

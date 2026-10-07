@@ -82,5 +82,14 @@ t('직접 고름: 모니터 구성이 바뀌면 모든 화면으로', () => {
   assert.strictEqual(r.cfg.mode, 'all');
 });
 
+const WA = [{ workArea: { x: 0, y: 0, width: 1920, height: 1040 }, primary: true }, { workArea: { x: 1920, y: 0, width: 1280, height: 760 }, primary: false }];
+t('펜 단추: 처음엔 주 화면 오른쪽 아래', () => assert.deepStrictEqual(S.penButtonPlace(null, WA, 44), { x: 1920 - 60, y: 1040 - 60 }));
+t('펜 단추: 옮긴 자리가 화면 안이면 그대로(두 번째 화면 포함)', () => assert.deepStrictEqual(S.penButtonPlace({ x: 2000, y: 100 }, WA, 44), { x: 2000, y: 100 }));
+t('펜 단추: 그 화면이 빠지면 주 화면 오른쪽 아래로', () => assert.deepStrictEqual(S.penButtonPlace({ x: 2000, y: 100 }, [WA[0]], 44), { x: 1860, y: 980 }));
+t('펜 단추 설정 기본 켜짐·잘못된 자리는 버림', () => {
+  assert.strictEqual(S.DEFAULTS.penButton, true);
+  assert.strictEqual(S.sanitize({ penButtonPos: { x: 'a', y: 1 } }).penButtonPos, null);
+});
+
 fs.rmSync(dir, { recursive: true, force: true });
 console.log(`\n${n}개 통과`);
