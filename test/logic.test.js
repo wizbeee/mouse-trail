@@ -1,4 +1,4 @@
-// 설정 저장·발표 모드·화면 선택 로직 시험 (Electron 없이)
+// 설정 저장·화면 선택 로직 시험 (Electron 없이)
 const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
@@ -49,27 +49,22 @@ t('첫 1.1.0 빌드가 저장한 은은하게 → 끔으로 한 번만 되돌림
   assert.strictEqual(S.sanitize({ halo: 'strong' }).halo, 'strong');
 });
 
-t('발표 모드 켜기 → 굵게·길게·밝은 색·선명하게, 끄면 직전 설정', () => {
-  const s0 = { ...S.DEFAULTS, enabled: false, glow: '255,100,180', life: 'short', thickness: 'normal', halo: 'off' };
-  const s1 = S.enterPresentation(s0);
-  assert.deepStrictEqual([s1.enabled, s1.thickness, s1.life, s1.halo, s1.glow], [true, 'thick', 'long', 'strong', '255,160,80']);
-  assert.strictEqual(s1.clickMark, 'off');   // 클릭 표시 승인 전
-  const s2 = S.exitPresentation(S.sanitize(JSON.parse(JSON.stringify(s1))));   // 저장·재시작을 거쳐도
-  for (const k of ['glow', 'life', 'thickness', 'halo']) assert.strictEqual(s2[k], s0[k], k);
-  assert.strictEqual(s2.presentation, false);
-  assert.strictEqual(s2.presentationSnapshot, null);
+t('없앤 발표 모드가 켜진 채 저장돼 있으면 켜기 전 값으로 되돌림', () => {
+  const r = S.sanitize({
+    schema: 2, glow: '255,160,80', life: 'long', thickness: 'thick', halo: 'strong',
+    presentation: true,
+    presentationSnapshot: { thickness: 'normal', life: 'short', glow: '170,140,255', halo: 'off', clickMark: 'off' },
+  });
+  assert.deepStrictEqual([r.thickness, r.life, r.glow, r.halo], ['normal', 'short', '170,140,255', 'off']);
+  assert.ok(!('presentation' in r) && !('presentationSnapshot' in r));
 });
-t('발표 모드 끄면 은은하게도 그대로 돌아옴(저장·재시작 거쳐도)', () => {
-  const s1 = S.enterPresentation({ ...S.DEFAULTS, halo: 'soft' });
-  assert.strictEqual(S.exitPresentation(S.sanitize(JSON.parse(JSON.stringify(s1)))).halo, 'soft');
+t('발표 모드 꺼진 채 저장된 값은 그대로', () => {
+  const r = S.sanitize({ schema: 2, thickness: 'thick', presentation: false, presentationSnapshot: null });
+  assert.strictEqual(r.thickness, 'thick');
 });
-t('발표 모드: 이미 시안이면 색 유지, 클릭 표시 가능하면 켬', () => {
-  const s1 = S.enterPresentation({ ...S.DEFAULTS, glow: '120,200,255' }, { clickAvailable: true });
-  assert.strictEqual(s1.glow, '120,200,255');
-  assert.strictEqual(s1.clickMark, 'ripple');
-});
-t('스냅샷 없는 presentation:true 는 풀림', () => {
-  assert.strictEqual(S.sanitize({ presentation: true }).presentation, false);
+t('옛 발표 모드 단축키는 사라짐', () => {
+  const r = S.sanitize({ hotkeys: { toggle: 'Control+Shift+F9', presentation: 'Control+Shift+F10' } });
+  assert.deepStrictEqual(Object.keys(r.hotkeys), ['toggle', 'find', 'laser']);
 });
 
 const L = { key: 'L', primary: true }, P = { key: 'P', primary: false };

@@ -25,7 +25,7 @@ let updateState = { status: app.isPackaged ? 'idle' : 'dev', version: null };
 const CLICK_AVAILABLE = false;
 const SLIDESHOW_AVAILABLE = false;
 
-let settings = store.load(SETTINGS_FILE);
+let settings = store.load(SETTINGS_FILE);   // 옛 판 값(발표 모드 등)은 여기서 정리됨 → 시작 때 한 번 다시 저장
 
 // ── 저장 ─────────────────────────────────────────────────────
 let saveTimer = null;
@@ -276,7 +276,6 @@ function locateCursor() {
 function update(patch) {
   const before = settings;
   settings = store.sanitize({ ...settings, ...patch });
-  // 발표 중 스냅샷은 sanitize 가 유지함
   const hotkeysChanged = JSON.stringify(before.hotkeys) !== JSON.stringify(settings.hotkeys);
   const displaysChanged = JSON.stringify(before.displays) !== JSON.stringify(settings.displays);
   if (displaysChanged) resolveActiveDisplays();
@@ -298,15 +297,6 @@ function setEnabled(on, withToast) {
   if (withToast) toast(on ? '꼬리 효과 켜짐' : '꼬리 효과 꺼짐');
 }
 
-function setPresentation(on, withToast) {
-  if (settings.presentation === on) return;
-  const next = on
-    ? store.enterPresentation(settings, { clickAvailable: CLICK_AVAILABLE })
-    : store.exitPresentation(settings);
-  update(next);
-  if (withToast) toast(on ? '발표 모드 켜짐' : '발표 모드 꺼짐');
-}
-
 function toggleLaser() {
   const laser = settings.shape !== 'laser';
   update({ shape: laser ? 'laser' : 'trail', enabled: true });
@@ -323,7 +313,6 @@ function applyAutoMultiMonitor(withToast) {
 // ── 단축키 (A3) ─────────────────────────────────────────────
 const HOTKEY_ACTIONS = {
   toggle:       () => setEnabled(!settings.enabled, true),
-  presentation: () => setPresentation(!settings.presentation, true),
   find:         () => locateCursor(),
   laser:        () => toggleLaser(),
 };
@@ -429,7 +418,6 @@ ipcMain.handle('mts:get-state', () => stateForWindow());
 ipcMain.on('mts:set', (_, patch) => {
   if (!patch || typeof patch !== 'object') return;
   if ('enabled' in patch) return setEnabled(!!patch.enabled, false);
-  if ('presentation' in patch) return setPresentation(!!patch.presentation, false);
   if ('glow' in patch && store.isRGB(patch.glow) && !store.COLORS.some(c => c.val === patch.glow)) {
     // 직접 고른 색은 최근 3개 기억 (B2)
     patch.recentColors = [patch.glow, ...settings.recentColors.filter(c => c !== patch.glow)].slice(0, 3);
@@ -473,12 +461,6 @@ function rebuildTrayMenu() {
       type: 'checkbox',
       checked: settings.enabled,
       click: (mi) => setEnabled(mi.checked, false),
-    },
-    {
-      label: '발표 모드',
-      type: 'checkbox',
-      checked: settings.presentation,
-      click: (mi) => setPresentation(mi.checked, false),
     },
     { type: 'separator' },
     {
@@ -525,6 +507,7 @@ function setupTray() {
 app.on('second-instance', () => openSettings());
 
 app.whenReady().then(() => {
+  saveSoon();
   setupOverlays();
   setupTray();
   registerHotkeys();
@@ -545,7 +528,7 @@ app.whenReady().then(() => {
 
   if (process.env.MT_SMOKE) {
     require('./test/smoke')({
-      get settings() { return settings; }, overlays, update, setEnabled, setPresentation, toggleLaser,
+      get settings() { return settings; }, overlays, update, setEnabled, toggleLaser,
       locateCursor, openSettings, get settingsWin() { return settingsWin; }, hotkeyStatus: () => hotkeyStatus,
       SETTINGS_FILE,
     });

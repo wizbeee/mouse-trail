@@ -89,10 +89,9 @@ module.exports = async function smoke(api) {
   fs.writeFileSync(path.join(out, 'halo-soft.png'), g.crop(Q.x, Q.y, 60).toPNG());
   const softS = sat(c0);
 
-  // 3) 발표 모드: 굵게 → 같은 쓸기에서 더 많은 픽셀, 빛은 선명하게(더 진함)
-  api.setPresentation(true, true);
+  // 3) 굵게 → 같은 쓸기에서 더 많은 픽셀, 빛은 선명하게(더 진함)
+  api.update({ thickness: 'thick', halo: 'strong' });
   await sleep(150);
-  check('발표 모드 설정값', api.settings.thickness === 'thick' && api.settings.halo === 'strong' && api.settings.life === 'long');
   await swipe(Q);
   await sleep(30);
   g = await grab();
@@ -103,9 +102,8 @@ module.exports = async function smoke(api) {
   g = await grab();
   check('선명하게가 은은하게보다 진함', sat(g.at(Q.x, Q.y)) > softS, `soft=${softS} strong=${sat(g.at(Q.x, Q.y))}`);
   fs.writeFileSync(path.join(out, 'halo-strong.png'), g.crop(Q.x, Q.y, 60).toPNG());
-  api.setPresentation(false, false);
+  api.update({ thickness: 'thin', halo: 'soft' });
   await sleep(100);
-  check('발표 모드 끄면 직전 설정', api.settings.thickness === 'thin' && api.settings.halo === 'soft' && api.settings.life === 'normal');
 
   // 4) 레이저 포인터: 빨간 점
   api.toggleLaser();
@@ -150,7 +148,7 @@ module.exports = async function smoke(api) {
 
   // 7) 단축키 — 등록 상태 + Ctrl+Shift+F9 를 실제로 눌러 켜기/끄기
   const hs = api.hotkeyStatus();
-  check('단축키 4개 등록', Object.values(hs).every(v => v === 'ok'), JSON.stringify(hs));
+  check('단축키 3개 등록', Object.values(hs).every(v => v === 'ok'), JSON.stringify(hs));
   const before = api.settings.enabled;
   await new Promise(r => execFile('powershell', ['-NoProfile', '-Command',
     "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^+{F9}')"], r));

@@ -3,7 +3,7 @@ const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
 let state = null;
 
-const HK_NAMES = { toggle: '켜기/끄기', presentation: '발표 모드', find: '커서 찾기', laser: '레이저' };
+const HK_NAMES = { toggle: '켜기/끄기', find: '커서 찾기', laser: '레이저' };
 
 function setAccent(rgb) {
   const [r, g, b] = rgb.split(',').map(Number);
@@ -95,7 +95,6 @@ function render() {
   setAccent(s.glow);
 
   $('#enabled').setAttribute('aria-pressed', s.enabled);
-  $('#presentation').setAttribute('aria-pressed', s.presentation);
 
   renderSwatches(s);
   for (const seg of $$('.seg')) {
@@ -136,7 +135,6 @@ function render() {
 
 // ── 입력 ────────────────────────────────────────────────────
 $('#enabled').onclick = () => window.mts.set({ enabled: !state.settings.enabled });
-$('#presentation').onclick = () => window.mts.set({ presentation: !state.settings.presentation });
 for (const seg of $$('.seg')) {
   seg.addEventListener('click', (e) => {
     const b = e.target.closest('button');

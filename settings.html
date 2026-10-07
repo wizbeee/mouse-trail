@@ -53,7 +53,7 @@
   }
   .banner svg { flex: none; margin-top: 2px; }
 
-  /* 큰 켜짐/발표 스위치 */
+  /* 큰 켜짐 스위치 */
   .toggles { display: flex; gap: 8px; }
   .big {
     flex: 1; height: 44px; border-radius: 10px; border: 1px solid var(--line);
@@ -134,7 +134,6 @@
 <div class="card">
   <div class="toggles">
     <button class="big" id="enabled"><span class="dot"></span>켜짐</button>
-    <button class="big" id="presentation"><span class="dot"></span>발표 모드</button>
   </div>
 </div>
 
@@ -193,7 +192,7 @@
   </div>
   <h2 style="margin-top:10px">자동 켜짐</h2>
   <label class="chk"><input type="checkbox" id="autoMultiMonitor"> 모니터가 2대 이상이면 켜고, 1대가 되면 끄기</label>
-  <label class="chk" id="slideshowLabel"><input type="checkbox" id="autoSlideshow"> PowerPoint 슬라이드 쇼가 시작되면 발표 모드로</label>
+  <label class="chk" id="slideshowLabel"><input type="checkbox" id="autoSlideshow"> PowerPoint 슬라이드 쇼가 시작되면 켜기</label>
   <div class="hint" id="slideshowHint" style="margin-left:26px">확인을 마친 뒤 켤 수 있습니다.</div>
 </div>
 
@@ -207,7 +206,6 @@
 <div class="card">
   <h2>단축키 <span style="font-weight:400">(누른 뒤 새 조합을 입력, Esc 취소, Backspace 끔)</span></h2>
   <div class="row"><span class="hk-name">켜기/끄기</span><button class="hk" data-hk="toggle"></button><span class="warn" data-hkw="toggle"></span></div>
-  <div class="row"><span class="hk-name">발표 모드</span><button class="hk" data-hk="presentation"></button><span class="warn" data-hkw="presentation"></span></div>
   <div class="row"><span class="hk-name">커서 찾기</span><button class="hk" data-hk="find"></button><span class="warn" data-hkw="find"></span></div>
   <div class="row"><span class="hk-name">레이저</span><button class="hk" data-hk="laser"></button><span class="warn" data-hkw="laser"></span></div>
   <div class="row" style="min-height:32px"><button class="link" id="hkReset">기본값으로</button><span class="warn" id="hkMsg"></span></div>

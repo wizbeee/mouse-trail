@@ -1,4 +1,5 @@
-// 설정 기본값 · 검증 · 파일 저장 (A1) + 발표 모드 전환(A2) + 화면 선택(A8).
+// 설정 기본값 · 검증 · 파일 저장 (A1) + 화면 선택(A8).
+// 발표 모드는 10/7 발주자 결정으로 없앰(설정이 저장되니 한 번 맞추면 됨).
 // Electron 없이 node 로 시험할 수 있게 순수 함수만 둔다.
 const fs = require('fs');
 const path = require('path');
@@ -14,11 +15,9 @@ const COLORS = [
 const LIFES      = { short: 30, normal: 60, long: 120 };
 const LIFE_NAMES = { short: '짧게', normal: '보통', long: '길게' };
 const THICKNESS  = { thin: 1.0, normal: 1.8, thick: 3.0 };   // 교실에서 보고 조정
-const BRIGHT     = ['255,160,80', '120,200,255'];             // 발표 모드용 밝은 색(주황·시안)
 
 const DEFAULT_HOTKEYS = {
   toggle:       'Control+Shift+F9',
-  presentation: 'Control+Shift+F10',
   find:         'Control+Shift+F11',
   laser:        'Control+Shift+F12',
 };
@@ -31,14 +30,12 @@ const DEFAULTS = {
   glow: '170,140,255',
   life: 'normal',
   thickness: 'thin',
-  halo: 'off',             // off | soft | strong — 기본 끔(1.0 모습), 발표 모드에서 선명하게
+  halo: 'off',             // off | soft | strong — 기본 끔(1.0 모습)
   haloPulse: false,        // 은은한 맥박 — 기본 꺼짐
   clickMark: 'off',        // off | ripple (A5 승인 전에는 쓰지 않음)
   shape: 'trail',          // trail | laser
   laserColor: 'red',       // red | green
   outline: false,          // 밝은 바탕용 테두리 항상 켜기 (B4 대체안)
-  presentation: false,
-  presentationSnapshot: null,
   recentColors: [],
   displays: { mode: 'all', off: [], known: [] },   // all | external | custom
   autoMultiMonitor: false,
@@ -54,11 +51,17 @@ const oneOf = (v, list, d) => (list.includes(v) ? v : d);
 const bool = (v, d) => (typeof v === 'boolean' ? v : d);
 const strList = (v) => (Array.isArray(v) ? v.filter(x => typeof x === 'string') : []);
 
+// 없앤 발표 모드가 켜진 채 저장돼 있으면, 켜기 전 값으로 되돌림
 const PRES_KEYS = ['thickness', 'life', 'glow', 'halo', 'clickMark'];
 
 function sanitize(raw) {
   const d = clone(DEFAULTS);
   if (!raw || typeof raw !== 'object') return d;
+  if (raw.presentation === true && raw.presentationSnapshot && typeof raw.presentationSnapshot === 'object') {
+    const snap = {};
+    for (const k of PRES_KEYS) if (k in raw.presentationSnapshot) snap[k] = raw.presentationSnapshot[k];
+    raw = { ...raw, ...snap };
+  }
   const s = d;
   s.enabled    = bool(raw.enabled, d.enabled);
   s.glow       = isRGB(raw.glow) ? raw.glow : d.glow;
@@ -72,16 +75,6 @@ function sanitize(raw) {
   s.shape      = oneOf(raw.shape, ['trail', 'laser'], d.shape);
   s.laserColor = oneOf(raw.laserColor, ['red', 'green'], d.laserColor);
   s.outline    = bool(raw.outline, d.outline);
-  s.presentation = bool(raw.presentation, false);
-  if (s.presentation && raw.presentationSnapshot && typeof raw.presentationSnapshot === 'object') {
-    const snap = {};
-    const ok = sanitize({ ...raw.presentationSnapshot, schema: SCHEMA });   // 같은 규칙으로 검증
-    for (const k of PRES_KEYS) snap[k] = ok[k];
-    s.presentationSnapshot = snap;
-  } else {
-    s.presentation = false;
-    s.presentationSnapshot = null;
-  }
   s.recentColors = strList(raw.recentColors).filter(isRGB).slice(0, 3);
   const dsp = raw.displays && typeof raw.displays === 'object' ? raw.displays : {};
   s.displays = {
@@ -120,29 +113,6 @@ function save(file, s) {
   }
 }
 
-// ── 발표 모드 (A2) ──────────────────────────────────────────
-function enterPresentation(s, { clickAvailable = false } = {}) {
-  if (s.presentation) return s;
-  const snap = {};
-  for (const k of PRES_KEYS) snap[k] = s[k];
-  return {
-    ...s,
-    enabled: true,
-    presentation: true,
-    presentationSnapshot: snap,
-    thickness: 'thick',
-    life: 'long',
-    halo: 'strong',
-    glow: BRIGHT.includes(s.glow) ? s.glow : BRIGHT[0],
-    clickMark: clickAvailable ? 'ripple' : s.clickMark,
-  };
-}
-
-function exitPresentation(s) {
-  if (!s.presentation) return s;
-  return { ...s, ...(s.presentationSnapshot || {}), presentation: false, presentationSnapshot: null };
-}
-
 // ── 화면 선택 (A8) ──────────────────────────────────────────
 // displays: [{ key, primary }]  →  { cfg, active: Set<key> }
 function resolveDisplays(cfg, displays) {
@@ -170,5 +140,5 @@ function colorName(rgb) {
 
 module.exports = {
   COLORS, LIFES, LIFE_NAMES, THICKNESS, DEFAULTS, DEFAULT_HOTKEYS,
-  sanitize, load, save, enterPresentation, exitPresentation, resolveDisplays, colorName, isRGB,
+  sanitize, load, save, resolveDisplays, colorName, isRGB,
 };
