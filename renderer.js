@@ -26,7 +26,7 @@ const MAX_POINTS  = 90;
 const MIN_DIST_SQ = 9;       // 3px
 const FRAME_MS    = 1000 / 60;
 const BBOX_MARGIN = 24;
-const STEPS       = 5;       // 테이퍼링 구간 수
+const STEPS       = 16;      // 테이퍼링 구간 수 (1.0은 5 — 구간 경계가 줄어들 때 툭툭 보여 늘림)
 
 // 브레이드를 이루는 3가닥 — 가운데 가닥이 가장 진하고 양옆은 살짝 흐리게.
 const STRANDS = [
@@ -263,6 +263,23 @@ function drawTrail() {
   const speeds  = computeSpeeds();
   const strands = STRANDS.map(st => buildStrand(normals, st.offset * k));
 
+  // 구간마다 진하기·굵기를 정하는 t 를 '점의 순서'가 아니라 '점의 나이'로 정한다.
+  // 순서로 정하면 오래된 점이 빠질 때마다 구간 경계가 한 칸씩 툭 넘어가고, 꼬리 끝이 진한 채로 잘림.
+  // 나이로 정하면 시간이 흐르는 만큼 매끄럽게 옅어지고, 끝은 0 이 된 뒤에 빠진다.
+  const now    = performance.now();
+  const lifeMs = settings.maxLife * FRAME_MS;
+  const ageT   = points.map(p => Math.min(1, Math.max(0, 1 - (now - p.t) / lifeMs)));
+  const meta0  = strands[1] ? strands[1].meta : [];
+  const tSeg = [], fadeSeg = [];
+  for (let s = 0; s < STEPS; s++) {
+    const mt = meta0[s];
+    let t = 0;
+    if (mt) { for (let i = mt.a; i <= mt.b; i++) t += ageT[i]; t /= (mt.b - mt.a + 1); }
+    tSeg[s] = t;
+    const f = Math.min(1, t / 0.35);
+    fadeSeg[s] = f * f * (3 - 2 * f);   // 끝으로 갈수록 부드럽게 0 으로
+  }
+
   ctx.lineCap  = 'round';
   ctx.lineJoin = 'round';
 
@@ -271,11 +288,11 @@ function drawTrail() {
     const { segs, meta } = strands[1];
     for (let s = 0; s < STEPS; s++) {
       if (!segs[s]) continue;
-      const t  = (s + 1) / STEPS;
+      const t  = tSeg[s];
       const vf = speedToFactor(avgSpeed(speeds, meta[s].a, meta[s].b));
       ctx.shadowBlur  = 10 * m;
       ctx.shadowColor = 'rgba(' + settings.glow + ',0.45)';
-      ctx.strokeStyle = 'rgba(' + settings.glow + ',' + (0.05 + t * 0.13) * vf * body + ')';
+      ctx.strokeStyle = 'rgba(' + settings.glow + ',' + (0.05 + t * 0.13) * vf * body * fadeSeg[s] + ')';
       ctx.lineWidth   = (1.5 + t * 3.5) * vf * m;
       ctx.stroke(segs[s]);
     }
@@ -287,9 +304,9 @@ function drawTrail() {
     ctx.shadowBlur = 0;
     for (let s = 0; s < STEPS; s++) {
       if (!segs[s]) continue;
-      const t  = (s + 1) / STEPS;
+      const t  = tSeg[s];
       const vf = speedToFactor(avgSpeed(speeds, meta[s].a, meta[s].b));
-      ctx.strokeStyle = 'rgba(0,0,0,' + (0.05 + t * 0.09) * vf + ')';
+      ctx.strokeStyle = 'rgba(0,0,0,' + (0.05 + t * 0.09) * vf * fadeSeg[s] + ')';
       ctx.lineWidth   = (0.40 + t * 1.10) * vf * k + 1.6 * k;
       ctx.stroke(segs[s]);
     }
@@ -304,10 +321,10 @@ function drawTrail() {
 
     for (let s = 0; s < STEPS; s++) {
       if (!segs[s]) continue;
-      const t    = (s + 1) / STEPS;                         // 0.2 → 1.0
+      const t    = tSeg[s];                                 // 꼬리 끝 0 → 머리 1
       const vf   = speedToFactor(avgSpeed(speeds, meta[s].a, meta[s].b));
       const w    = (0.40 + t * 1.10) * vf * k;              // 얇게 0.4 → 1.5 px (중앙)
-      const a    = (0.18 + t * 0.75) * strand.alphaMult * vf;
+      const a    = (0.18 + t * 0.75) * strand.alphaMult * vf * fadeSeg[s];
       // 꼬리 끝은 설정된 컬러, 헤드는 흰색에 가깝게 (혜성 그라디언트)
       const color = lerpRGB(settings.glow, settings.core, t * t);
 
@@ -324,8 +341,8 @@ function drawTrail() {
   const headSpd   = speeds[N - 1];
   const sparkSize = (0.9 + Math.max(0, 1 - headSpd / 1200) * 1.6) * k;
   ctx.shadowBlur  = 6 * k;
-  ctx.shadowColor = 'rgba(' + settings.core + ',1)';
-  ctx.fillStyle   = 'rgba(' + settings.core + ',0.92)';
+  ctx.shadowColor = 'rgba(' + settings.core + ',' + ageT[N - 1] + ')';
+  ctx.fillStyle   = 'rgba(' + settings.core + ',' + 0.92 * ageT[N - 1] + ')';   // 멈추면 빛점도 함께 옅어짐
   ctx.beginPath();
   ctx.arc(head.x, head.y, sparkSize, 0, Math.PI * 2);
   ctx.fill();
