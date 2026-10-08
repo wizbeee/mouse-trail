@@ -6,7 +6,8 @@
 - 빛나는 꼬리(굵기 3단계 — 굵게는 가는 선 둘레에 옅은 빛 띠) + **빛나는 커서**(선택, 기본 끔)
 - **빛나는 커서** 나타나는 방식 3가지(스며들기·커지며·퍼지는 원)
 - **클릭 표시**(왼쪽 = 원 하나, 오른쪽 = 이중 원이 퍼짐)
-- **레이저 포인터**, **레이저 펜**(화면 어디에나 쓰고 2초 뒤 사라짐), **커서 찾기**(동심원이 커서로 모여듦)
+- **레이저 포인터**, **레이저 펜**(화면 어디에나 쓰고 2초 뒤 사라짐 · 마우스·손가락·펜), **커서 찾기**(동심원이 커서로 모여듦)
+- **펜 단추**: 화면 구석에 늘 떠 있는 작은 단추 — 누르면 레이저 펜 켜기/끄기, 끌어서 옮기기
 - **화면마다 켜기**(프로젝터에만 효과), 자동 켜짐(모니터 2대 이상 · **PowerPoint 슬라이드 쇼 중**)
 - 설정은 `%APPDATA%\mouse-trail\settings.json` 에 자동 저장
 - 자동 업데이트(GitHub Releases [wizbeee/mouse-trail](https://github.com/wizbeee/mouse-trail/releases))
@@ -61,6 +62,7 @@ MT_SMOKE=1 MT_SETTINGS_FILE=<임시>/settings.json MT_SMOKE_OUT=<임시> npx ele
 - `store.js` — 설정 기본값·검증·저장(옛 판 값 정리 포함), 화면 선택(순수 함수, `test/logic.test.js`)
 - `index.html` / `renderer.js` — 꼬리(잔상 캔버스) + 빛나는 커서·레이저·커서 찾기·안내 문구(효과 캔버스)
 - `settings.html` / `settings.js` / `settings-preload.js` — 설정 창
+- `pen-button.html` / `pen-button-preload.js` — 화면 구석 펜 단추
 - `slideshow.js` — 슬라이드 쇼 감지(숨은 PowerShell 1개가 1초마다 확인, 앱이 끝나면 함께 끝남)
 - `tools/ppt-slideshow-test.ps1` — 슬라이드 쇼 감지 단독 시험
 

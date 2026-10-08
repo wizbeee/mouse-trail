@@ -1,7 +1,7 @@
-# Mouse Trail 인수인계 — v1.1.2 (2026-10-07)
+# Mouse Trail 인수인계 — v1.1.4 (2026-10-08)
 
 > 계획서: `../프로그램_소개_및_계획서_2026-10-07/03_MouseTrail_업그레이드계획서_v2.md`
-> **Public GitHub [wizbeee/mouse-trail](https://github.com/wizbeee/mouse-trail)** · 릴리스 v1.1.0 · v1.1.1 · v1.1.2. 올리기: `GH_TOKEN=$(gh auth token) npm run publish` (package.json 버전 먼저 올림)
+> **Public GitHub [wizbeee/mouse-trail](https://github.com/wizbeee/mouse-trail)** · 릴리스 v1.1.0 ~ v1.1.4. 올리기: `GH_TOKEN=$(gh auth token) npm run publish` (package.json 버전 먼저 올림)
 
 ## ✅ 된 것 (코드 + 시험)
 
@@ -44,7 +44,7 @@
 ## 1.1.3 (10/7)
 - 레이저 펜이 **손가락·펜(터치스크린)으로 안 써지던 것** 고침: 브라우저 기본 동작이 끌기를 화면 밀기로 가져가 pointercancel → 펜 모드에서 `touch-action: none`. 시험 `npx electron test/look/pen-touch.js`(숨은 창에서 CDP 로 터치 흉내).
 
-## 1.1.4 (10/7, 설치만 · GitHub 배포는 발주자 확인 뒤)
+## 1.1.4 (10/7 설치, 10/8 발주자 요청으로 GitHub 배포)
 - **펜 단추**: 화면 구석에 늘 떠 있는 44px 단추(pen-button.html). 누르면 펜 켜기/끄기, 4px 넘게 끌면 옮기고 자리 저장. focusable:false 라 PowerPoint 초점 안 뺏음, 펜 동안에도 오버레이 위(screen-saver 2 + moveTop). 설정 「화면 구석에 펜 단추 늘 띄우기」 기본 켜짐. 시험 `npx electron test/look/penbtn.js`(숨은 창). 🔴 실제 화면에서 펜 켠 뒤에도 단추가 눌리는지는 발주자 확인 필요.
 
 ## 알아 둘 것
