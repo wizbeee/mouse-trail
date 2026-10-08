@@ -151,7 +151,7 @@ module.exports = async function smoke(api) {
 
   // 7) 단축키 — 등록 상태 + Ctrl+Shift+F9 를 실제로 눌러 켜기/끄기
   const hs = api.hotkeyStatus();
-  check('단축키 3개 등록', Object.values(hs).every(v => v === 'ok'), JSON.stringify(hs));
+  check('단축키 4개 등록', Object.values(hs).every(v => v === 'ok'), JSON.stringify(hs));
   if (REAL) {
     const before = api.settings.enabled;
     await new Promise(r => execFile('powershell', ['-NoProfile', '-Command',
@@ -268,12 +268,14 @@ module.exports = async function smoke(api) {
     check('2.5초 뒤 글씨 사라짐', g.countIn(Q.x, Q.y, 140) === 0);
     target.destroy();
 
-    // 단축키 순환: 꼬리 → 레이저 → 펜 → 꼬리
+
+    // 단축키: 레이저 켜기/끄기, 쓰기 켜기/끄기 (쓰기는 잠깐 클릭을 막으므로 REAL 일 때만)
     api.update({ shape: 'trail' });
     api.toggleLaser(); const s1 = api.settings.shape;
-    api.toggleLaser(); const s2 = api.penMode;
-    api.toggleLaser(); const s3 = api.settings.shape + '/' + api.penMode;
-    check('단축키 순환 꼬리→레이저→펜→꼬리', s1 === 'laser' && s2 === true && s3 === 'trail/false', `${s1} ${s2} ${s3}`);
+    api.togglePen(); const s2 = api.penMode;
+    api.togglePen(); const s3 = api.penMode;
+    api.toggleLaser(); const s4 = api.settings.shape;
+    check('레이저·쓰기 단축키', s1 === 'laser' && s2 === true && s3 === false && s4 === 'trail', `${s1} ${s2} ${s3} ${s4}`);
   }
   api.update({ clickMark: 'off' });
 

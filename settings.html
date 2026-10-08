@@ -116,7 +116,7 @@
     padding: 0 10px; cursor: pointer; text-align: left;
   }
   .hk.capturing { outline: 2px solid var(--accent); }
-  .hk-name { width: 78px; flex: none; color: var(--muted); font-size: 13px; }
+  .hk-name { width: 96px; flex: none; color: var(--muted); font-size: 13px; }
 
   footer { color: var(--muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 2px 4px; }
   footer .sep { opacity: .5; }
@@ -187,7 +187,7 @@
     <span class="label">레이저 펜</span>
     <button class="small-btn" id="penStart"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>화면에 쓰기</button>
   </div>
-  <div class="hint">쓴 글씨는 펜을 떼고 2초 뒤 사라져요. 한 번 켜면 Esc·[끝내기]를 누를 때까지 계속 쓸 수 있어요.</div>
+  <div class="hint">쓴 글씨는 펜을 떼고 2초 뒤 사라져요. 한 번 켜면 끌 때까지 계속 쓸 수 있어요(단축키 다시 누르기·Esc·[끝내기]).</div>
   <div class="hint"><label class="chk" style="min-height:28px"><input type="checkbox" id="penButton"> 화면 구석에 펜 단추 늘 띄우기 (누르면 켜기/끄기, 끌어서 옮기기)</label></div>
   <div class="row">
     <span class="label">레이저·펜 색</span>
@@ -221,10 +221,10 @@
 
 <div class="card">
   <h2>단축키 <span style="font-weight:400">(누른 뒤 새 조합을 입력, Esc 취소, Backspace 끔)</span></h2>
-  <div class="hint" style="margin:0 0 4px">레이저·펜 단축키는 누를 때마다 꼬리 → 레이저 포인터 → 레이저 펜 → 꼬리 순서로 바뀝니다.</div>
   <div class="row"><span class="hk-name">켜기/끄기</span><button class="hk" data-hk="toggle"></button><span class="warn" data-hkw="toggle"></span></div>
+  <div class="row"><span class="hk-name">레이저 포인터</span><button class="hk" data-hk="laser"></button><span class="warn" data-hkw="laser"></span></div>
+  <div class="row"><span class="hk-name">화면에 쓰기</span><button class="hk" data-hk="pen"></button><span class="warn" data-hkw="pen"></span></div>
   <div class="row"><span class="hk-name">커서 찾기</span><button class="hk" data-hk="find"></button><span class="warn" data-hkw="find"></span></div>
-  <div class="row"><span class="hk-name">레이저·펜</span><button class="hk" data-hk="laser"></button><span class="warn" data-hkw="laser"></span></div>
   <div class="row" style="min-height:32px"><button class="link" id="hkReset">기본값으로</button><span class="warn" id="hkMsg"></span></div>
   <label class="chk" style="margin-top:6px"><input type="checkbox" id="openAtLogin"> Windows 시작 시 자동 실행</label>
 </div>

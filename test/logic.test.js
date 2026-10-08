@@ -34,7 +34,7 @@ t('잘못된 값은 기본값으로', () => {
   assert.strictEqual(r.life, 'normal');
   assert.strictEqual(r.halo, 'off');
   assert.strictEqual(r.thickness, 'thin');
-  assert.strictEqual(r.hotkeys.toggle, 'Control+Shift+F9');
+  assert.strictEqual(r.hotkeys.toggle, 'Control+Alt+1');
 });
 t('단축키 빈 문자열 = 사용 안 함 유지', () => {
   assert.strictEqual(S.sanitize({ hotkeys: { find: '' } }).hotkeys.find, '');
@@ -62,9 +62,18 @@ t('발표 모드 꺼진 채 저장된 값은 그대로', () => {
   const r = S.sanitize({ schema: 2, thickness: 'thick', presentation: false, presentationSnapshot: null });
   assert.strictEqual(r.thickness, 'thick');
 });
-t('옛 발표 모드 단축키는 사라짐', () => {
+t('옛 발표 모드 단축키는 사라지고 쓰기 단축키가 생김', () => {
   const r = S.sanitize({ hotkeys: { toggle: 'Control+Shift+F9', presentation: 'Control+Shift+F10' } });
-  assert.deepStrictEqual(Object.keys(r.hotkeys), ['toggle', 'find', 'laser']);
+  assert.deepStrictEqual(Object.keys(r.hotkeys), ['toggle', 'laser', 'pen', 'find']);
+});
+t('예전 F키 기본값은 숫자 키로 옮기고, 직접 바꾼 것은 그대로', () => {
+  const r = S.sanitize({ schema: 2, hotkeys: { toggle: 'Control+Shift+F9', find: 'Control+Shift+F11', laser: 'Alt+L' } });
+  assert.deepStrictEqual(r.hotkeys, { toggle: 'Control+Alt+1', laser: 'Alt+L', pen: 'Control+Alt+3', find: 'Control+Alt+4' });
+  // 옮긴 뒤(schema 3)에 일부러 F키로 다시 고르면 그대로
+  assert.strictEqual(S.sanitize({ schema: 3, hotkeys: { toggle: 'Control+Shift+F9' } }).hotkeys.toggle, 'Control+Shift+F9');
+});
+t('schema 2 에서 고른 은은하게는 schema 3 이 되어도 그대로', () => {
+  assert.strictEqual(S.sanitize({ schema: 2, halo: 'soft' }).halo, 'soft');
 });
 
 const L = { key: 'L', primary: true }, P = { key: 'P', primary: false };

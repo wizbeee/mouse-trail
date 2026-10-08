@@ -16,13 +16,21 @@ const LIFES      = { short: 30, normal: 60, long: 120 };
 const LIFE_NAMES = { short: '짧게', normal: '보통', long: '길게' };
 const THICKNESS  = { thin: 1.0, normal: 1.8, thick: 3.0 };   // 교실에서 보고 조정
 
+// 10/8: F키는 노트북(갤럭시 북 등)에서 Fn 을 같이 눌러야 해서 숫자 키로. 교사 도구함은 Ctrl+Alt+글자를 씀
 const DEFAULT_HOTKEYS = {
-  toggle:       'Control+Shift+F9',
-  find:         'Control+Shift+F11',
-  laser:        'Control+Shift+F12',
+  toggle: 'Control+Alt+1',   // 효과 켜기/끄기
+  laser:  'Control+Alt+2',   // 레이저 포인터 켜기/끄기
+  pen:    'Control+Alt+3',   // 화면에 쓰기(레이저 펜) 켜기/끄기
+  find:   'Control+Alt+4',   // 커서 찾기
+};
+// 예전 기본값 — 사용자가 바꾸지 않았으면 새 기본값으로 옮김
+const OLD_DEFAULT_HOTKEYS = {
+  toggle: 'Control+Shift+F9',
+  laser:  'Control+Shift+F12',
+  find:   'Control+Shift+F11',
 };
 
-const SCHEMA = 2;   // 2: 빛나는 커서 기본값을 끔으로(1.0 모습 유지)
+const SCHEMA = 3;   // 2: 빛나는 커서 기본값을 끔으로(1.0 모습 유지) · 3: 단축키를 숫자 키로
 
 const DEFAULTS = {
   schema: SCHEMA,
@@ -72,7 +80,7 @@ function sanitize(raw) {
   s.thickness  = oneOf(raw.thickness, Object.keys(THICKNESS), d.thickness);
   s.halo       = oneOf(raw.halo, ['off', 'soft', 'strong'], d.halo);
   // 첫 1.1.0 빌드는 '은은하게'를 기본으로 저장했음 → 한 번만 끔으로 되돌림
-  if (raw.schema !== SCHEMA && s.halo === 'soft') s.halo = 'off';
+  if (!(raw.schema >= 2) && s.halo === 'soft') s.halo = 'off';
   s.haloStyle  = oneOf(raw.haloStyle, ['fade', 'grow', 'ring'], d.haloStyle);
   s.haloPulse  = bool(raw.haloPulse, d.haloPulse);
   s.clickMark  = oneOf(raw.clickMark, ['off', 'ripple'], d.clickMark);
@@ -92,6 +100,7 @@ function sanitize(raw) {
   for (const k of Object.keys(DEFAULT_HOTKEYS)) {
     // 빈 문자열 = 사용 안 함
     s.hotkeys[k] = typeof hk[k] === 'string' ? hk[k] : DEFAULT_HOTKEYS[k];
+    if (!(raw.schema >= 3) && hk[k] === OLD_DEFAULT_HOTKEYS[k]) s.hotkeys[k] = DEFAULT_HOTKEYS[k];
   }
   s.firstRunShown = bool(raw.firstRunShown, false);
   s.penButton = bool(raw.penButton, d.penButton);

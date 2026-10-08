@@ -3,7 +3,7 @@ const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
 let state = null;
 
-const HK_NAMES = { toggle: '켜기/끄기', find: '커서 찾기', laser: '레이저·펜' };
+const HK_NAMES = { toggle: '켜기/끄기', laser: '레이저 포인터', pen: '화면에 쓰기', find: '커서 찾기' };
 
 function setAccent(rgb) {
   const [r, g, b] = rgb.split(',').map(Number);

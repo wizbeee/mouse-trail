@@ -326,26 +326,26 @@ function setEnabled(on, withToast) {
   if (withToast) toast(on ? '꼬리 효과 켜짐' : '꼬리 효과 꺼짐');
 }
 
-// 단축키를 누를 때마다 꼬리 → 레이저 포인터 → 레이저 펜 → 꼬리
+// 레이저 포인터 켜기/끄기 (꼬리 ↔ 레이저). 쓰는 중이었으면 쓰기도 끝냄
 function toggleLaser() {
-  if (penMode) {
-    setPenMode(false, false);
-    update({ shape: 'trail' });
-    toast('꼬리 모드');
-  } else if (settings.shape !== 'laser') {
-    update({ shape: 'laser', enabled: true });
-    toast('레이저 포인터');
-  } else {
-    if (!settings.enabled) update({ enabled: true });
-    setPenMode(true);
-  }
+  if (penMode) setPenMode(false, false);
+  const laser = settings.shape !== 'laser';
+  update({ shape: laser ? 'laser' : 'trail', enabled: true });
+  toast(laser ? '레이저 포인터' : '꼬리 모드');
+}
+
+// 화면에 쓰기(레이저 펜) 켜기/끄기 — 한 번에
+function togglePen() {
+  if (penMode) return setPenMode(false);
+  if (!settings.enabled) update({ enabled: true });
+  setPenMode(true);
 }
 
 // ── 레이저 펜 (B6) ──────────────────────────────────────────
 function applyPenToOverlay(win) {
   if (!win || win.isDestroyed()) return;
   win.setIgnoreMouseEvents(!penMode);
-  win.webContents.send('pen', { on: penMode, escOk: penEscOk, endKey: (settings.hotkeys.laser || '').replace(/Control/g, 'Ctrl') });
+  win.webContents.send('pen', { on: penMode, escOk: penEscOk, endKey: (settings.hotkeys.pen || '').replace(/Control/g, 'Ctrl') });
 }
 
 function setPenMode(on, withToast = true) {
@@ -413,11 +413,7 @@ function syncPenButton() {
   penBtn.on('closed', () => { penBtn = null; });
 }
 
-ipcMain.on('penbtn:toggle', () => {
-  if (penMode) return setPenMode(false);
-  if (!settings.enabled) update({ enabled: true });
-  setPenMode(true);
-});
+ipcMain.on('penbtn:toggle', () => togglePen());
 ipcMain.on('penbtn:move', (_, dx, dy) => {
   if (!penBtn || penBtn.isDestroyed()) return;
   const [x, y] = penBtn.getPosition();
@@ -498,6 +494,7 @@ const HOTKEY_ACTIONS = {
   toggle:       () => { slideTurnedOn = false; setEnabled(!settings.enabled, true); },
   find:         () => locateCursor(),
   laser:        () => toggleLaser(),
+  pen:          () => togglePen(),
 };
 
 function registerHotkeys() {
@@ -737,7 +734,7 @@ app.whenReady().then(() => {
 
   if (process.env.MT_SMOKE) {
     require('./test/smoke')({
-      get settings() { return settings; }, overlays, update, setEnabled, toggleLaser, setPenMode, get penMode() { return penMode; },
+      get settings() { return settings; }, overlays, update, setEnabled, toggleLaser, togglePen, setPenMode, get penMode() { return penMode; },
       hookEvents: () => hookEvents, get slideActive() { return slideActive; }, get penEscOk() { return penEscOk; }, get clickAvailable() { return clickAvailable; },
       locateCursor, openSettings, get settingsWin() { return settingsWin; }, hotkeyStatus: () => hotkeyStatus,
       SETTINGS_FILE,

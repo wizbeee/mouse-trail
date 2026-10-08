@@ -1,7 +1,7 @@
-# Mouse Trail 인수인계 — v1.1.4 (2026-10-08)
+# Mouse Trail 인수인계 — v1.1.5 (2026-10-08)
 
 > 계획서: `../프로그램_소개_및_계획서_2026-10-07/03_MouseTrail_업그레이드계획서_v2.md`
-> **Public GitHub [wizbeee/mouse-trail](https://github.com/wizbeee/mouse-trail)** · 릴리스 v1.1.0 ~ v1.1.4. 올리기: `GH_TOKEN=$(gh auth token) npm run publish` (package.json 버전 먼저 올림)
+> **Public GitHub [wizbeee/mouse-trail](https://github.com/wizbeee/mouse-trail)** · 릴리스 v1.1.0 ~ v1.1.5. 올리기: `GH_TOKEN=$(gh auth token) npm run publish` (package.json 버전 먼저 올림)
 
 ## ✅ 된 것 (코드 + 시험)
 
@@ -47,8 +47,12 @@
 ## 1.1.4 (10/7 설치, 10/8 발주자 요청으로 GitHub 배포)
 - **펜 단추**: 화면 구석에 늘 떠 있는 44px 단추(pen-button.html). 누르면 펜 켜기/끄기, 4px 넘게 끌면 옮기고 자리 저장. focusable:false 라 PowerPoint 초점 안 뺏음, 펜 동안에도 오버레이 위(screen-saver 2 + moveTop). 설정 「화면 구석에 펜 단추 늘 띄우기」 기본 켜짐. 시험 `npx electron test/look/penbtn.js`(숨은 창). 🔴 실제 화면에서 펜 켠 뒤에도 단추가 눌리는지는 발주자 확인 필요.
 
+## 1.1.5 (10/8)
+- **단축키를 숫자 키로**: 갤럭시 북(960XGK)에서 Ctrl+Shift+F12 가 안 됨(F키가 기능 키라 Fn 필요) → Ctrl+Alt+1 효과 · 2 레이저 포인터 · 3 화면에 쓰기 · 4 커서 찾기. 교사 도구함(Ctrl+Alt+글자)과 안 겹침, 이 PC 에서 4개 모두 비어 있음 확인. schema 3: 예전 F키 기본값이면 자동으로 옮기고 직접 바꾼 건 그대로.
+- 레이저 단축키는 이제 순환이 아니라 레이저 켜기/끄기, **화면에 쓰기 전용 단축키** 추가(펜 단추와 같은 동작).
+- Word Ctrl+Alt+1~3(제목 스타일)과 겹침.
+
 ## 알아 둘 것
-- Word: Ctrl+Shift+F9(필드 연결 끊기)·F11(필드 잠금 해제)·F12(인쇄)와 겹침. 앱이 가로챔.
 - 시험 실행 시 `MT_SETTINGS_FILE` 로 임시 설정 파일을 써서 실제 설정을 건드리지 않음.
 - 연기 시험 중 실제 마우스를 움직이면 「빛나는 커서」 확인이 실패할 수 있음(실제 커서 위치가 덮어씀). 설치된 Mouse Trail 이 켜져 있으면 같은 단일 실행 잠금 때문에 연기 시험이 아무 출력 없이 끝남 → 먼저 종료.
 - 굵기는 심(브레이드)을 1·1.24·1.6배만 키우고 꼬리 색 빛 띠로 넓힘(10/7: 3배로 키우니 가운데 선이 흰 막대처럼 진해 어색하다는 의견). 모양 비교 그림: `npx electron test/look/look.js <폴더>` → grid.png
