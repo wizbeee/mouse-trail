@@ -351,7 +351,7 @@ function applyPenToOverlay(win) {
 function setPenMode(on, withToast = true) {
   if (penMode === on) return;
   penMode = on;
-  registerHotkeys();   // 펜 동안만 Esc 를 잡음
+  syncPenEsc();   // 펜 동안만 Esc 를 잡음
   for (const win of overlays.values()) applyPenToOverlay(win);
   raisePenButton();
   sendPenBtnState();
@@ -490,6 +490,15 @@ function applyAutoMultiMonitor(withToast) {
 }
 
 // ── 단축키 (A3) ─────────────────────────────────────────────
+// 키 반복 지연(제어판 › 키보드)을 읽어 반복 무시 간격을 정함
+let keyboardDelay = 1;
+try {
+  const out = require('child_process').execSync('reg query "HKCU\\Control Panel\\Keyboard" /v KeyboardDelay', { windowsHide: true, timeout: 3000 }).toString();
+  const m = out.match(/KeyboardDelay\s+REG_SZ\s+(\d)/);
+  if (m) keyboardDelay = +m[1];
+} catch (_) {}
+const hotkeyRepeat = store.makeRepeatGuard(store.repeatGapMs(keyboardDelay));
+
 const HOTKEY_ACTIONS = {
   toggle:       () => { slideTurnedOn = false; setEnabled(!settings.enabled, true); },
   find:         () => locateCursor(),
@@ -505,11 +514,22 @@ function registerHotkeys() {
     const acc = settings.hotkeys[name];
     if (!acc) { hotkeyStatus[name] = 'off'; continue; }
     let ok = false;
-    try { ok = globalShortcut.register(acc, fn); } catch (_) { ok = false; }
+    try { ok = globalShortcut.register(acc, () => { if (hotkeyRepeat(name, Date.now())) fn(); }); } catch (_) { ok = false; }
     hotkeyStatus[name] = ok ? 'ok' : 'fail';
   }
-  penEscOk = false;
-  if (penEscRetry) { clearInterval(penEscRetry); penEscRetry = null; }
+  penEscOk = false;   // unregisterAll 로 Esc 도 풀렸음
+  syncPenEsc();
+}
+
+// 쓰는 동안만 Esc 를 잡음. 다른 단축키는 건드리지 않음
+// (예전에는 쓰기를 켜고 끌 때마다 단축키를 모두 다시 등록해서, 누르고 있던 단축키가 다시 들어와 왕복했음)
+function syncPenEsc() {
+  if (!penMode) {
+    if (penEscRetry) { clearInterval(penEscRetry); penEscRetry = null; }
+    if (penEscOk) { try { globalShortcut.unregister('Escape'); } catch (_) {} penEscOk = false; }
+    return;
+  }
+  if (penEscOk || penEscRetry) return;
   if (penMode) {
     // 다른 프로그램(교사 도구함의 판서·가림막 등)이 Esc 를 쥐고 있으면 실패 → 0.5초마다 다시 시도하고,
     // 그동안은 위쪽 띠에 [끝내기]·단축키로 끝내라고 알림

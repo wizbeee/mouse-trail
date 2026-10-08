@@ -161,6 +161,23 @@ function penButtonPlace(pos, displays, size, margin = 16) {
   return { x: w.x + w.width - size - margin, y: w.y + w.height - size - margin };
 }
 
+// 단축키를 누르고 있으면 Windows 가 같은 단축키를 계속 보냄(자동 반복) → 켜졌다 꺼졌다 무한 왕복(10/8).
+// 같은 단축키가 gapMs 안에 다시 오면 무시하고 시각만 갱신 → 누르고 있는 동안은 한 번, 떼었다 다시 눌러야 다음 동작.
+function makeRepeatGuard(gapMs) {
+  const last = {};
+  return (name, now) => {
+    const prev = last[name];
+    last[name] = now;
+    return prev === undefined || now - prev > gapMs;
+  };
+}
+
+// Windows 「키 반복 지연」(0~3 → 250~1000ms) 보다 조금 길게
+function repeatGapMs(keyboardDelay) {
+  const d = Number.isInteger(keyboardDelay) && keyboardDelay >= 0 && keyboardDelay <= 3 ? keyboardDelay : 1;
+  return (d + 1) * 250 + 200;
+}
+
 function colorName(rgb) {
   const c = COLORS.find(x => x.val === rgb);
   return c ? c.name : '직접 고른 색';
@@ -168,5 +185,5 @@ function colorName(rgb) {
 
 module.exports = {
   COLORS, LIFES, LIFE_NAMES, THICKNESS, DEFAULTS, DEFAULT_HOTKEYS,
-  sanitize, load, save, resolveDisplays, penButtonPlace, colorName, isRGB,
+  sanitize, load, save, resolveDisplays, penButtonPlace, makeRepeatGuard, repeatGapMs, colorName, isRGB,
 };

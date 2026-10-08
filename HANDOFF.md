@@ -1,7 +1,7 @@
-# Mouse Trail 인수인계 — v1.1.5 (2026-10-08)
+# Mouse Trail 인수인계 — v1.1.6 (2026-10-08)
 
 > 계획서: `../프로그램_소개_및_계획서_2026-10-07/03_MouseTrail_업그레이드계획서_v2.md`
-> **Public GitHub [wizbeee/mouse-trail](https://github.com/wizbeee/mouse-trail)** · 릴리스 v1.1.0 ~ v1.1.5. 올리기: `GH_TOKEN=$(gh auth token) npm run publish` (package.json 버전 먼저 올림)
+> **Public GitHub [wizbeee/mouse-trail](https://github.com/wizbeee/mouse-trail)** · 릴리스 v1.1.0 ~ v1.1.6. 올리기: `GH_TOKEN=$(gh auth token) npm run publish` (package.json 버전 먼저 올림)
 
 ## ✅ 된 것 (코드 + 시험)
 
@@ -51,6 +51,9 @@
 - **단축키를 숫자 키로**: 갤럭시 북(960XGK)에서 Ctrl+Shift+F12 가 안 됨(F키가 기능 키라 Fn 필요) → Ctrl+Alt+1 효과 · 2 레이저 포인터 · 3 화면에 쓰기 · 4 커서 찾기. 교사 도구함(Ctrl+Alt+글자)과 안 겹침, 이 PC 에서 4개 모두 비어 있음 확인. schema 3: 예전 F키 기본값이면 자동으로 옮기고 직접 바꾼 건 그대로.
 - 레이저 단축키는 이제 순환이 아니라 레이저 켜기/끄기, **화면에 쓰기 전용 단축키** 추가(펜 단추와 같은 동작).
 - Word Ctrl+Alt+1~3(제목 스타일)과 겹침.
+
+## 1.1.6 (10/8)
+- **Ctrl+Alt+3 누르면 쓰기가 켜졌다 꺼졌다 무한 왕복**(발주자 실기기) 고침: ① 누르고 있는 동안 Windows 가 단축키를 반복해 보냄 → 같은 단축키가 「키 반복 지연+200ms」(이 PC 700ms) 안에 다시 오면 무시하고 시각만 갱신(`store.makeRepeatGuard`) ② 쓰기를 켜고 끌 때 단축키를 모두 다시 등록하던 것을 Esc 만 등록·해제(`syncPenEsc`). 실제 키 시험은 발주자 몫.
 
 ## 알아 둘 것
 - 시험 실행 시 `MT_SETTINGS_FILE` 로 임시 설정 파일을 써서 실제 설정을 건드리지 않음.

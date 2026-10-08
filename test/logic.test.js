@@ -100,5 +100,24 @@ t('펜 단추 설정 기본 켜짐·잘못된 자리는 버림', () => {
   assert.strictEqual(S.sanitize({ penButtonPos: { x: 'a', y: 1 } }).penButtonPos, null);
 });
 
+t('단축키를 누르고 있어도 한 번만(자동 반복 무시)', () => {
+  const g = S.makeRepeatGuard(S.repeatGapMs(1));   // 700ms
+  // 0ms 에 누름 → 500ms 뒤부터 33ms 마다 자동 반복 → 2초에 뗌
+  const times = [0]; for (let t = 500; t <= 2000; t += 33) times.push(t);
+  const fired = times.filter(t => g('pen', t));
+  assert.deepStrictEqual(fired, [0]);
+  // 떼고 1초 뒤 다시 누르면 동작
+  assert.strictEqual(g('pen', 3000), true);
+});
+t('따로따로 누르면 매번 동작, 다른 단축키는 서로 안 막음', () => {
+  const g = S.makeRepeatGuard(700);
+  assert.deepStrictEqual([0, 900, 1800].map(t => g('pen', t)), [true, true, true]);
+  assert.strictEqual(g('laser', 1850), true);
+});
+t('키 반복 지연 값이 이상하면 보통(1)으로', () => {
+  assert.strictEqual(S.repeatGapMs(3), 1200);
+  assert.strictEqual(S.repeatGapMs(undefined), 700);
+});
+
 fs.rmSync(dir, { recursive: true, force: true });
 console.log(`\n${n}개 통과`);
